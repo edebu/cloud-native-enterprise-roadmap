@@ -43,3 +43,40 @@ resource "google_compute_router_nat" "nat" {
     filter = "ERRORS_ONLY"
   }
 }
+
+# 1. SSH (Port 22) erişimini dış dünyaya tamamen kapatan / kısıtlayan kural
+resource "google_compute_firewall" "deny_external_ssh" {
+  name    = "${var.network_name}-deny-external-ssh"
+  network = google_compute_network.vpc.name
+  direction = "INGRESS"
+  priority  = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  # Not: GCP IAP IP aralığı (35.235.240.0/20) üzerinden güvenli bağlantıya ileride izin verilebilir.
+}
+
+# 2. Internal (Ağ içi) iletişime izin veren kural
+resource "google_compute_firewall" "allow_internal" {
+  name    = "${var.network_name}-allow-internal"
+  network = google_compute_network.vpc.name
+  direction = "INGRESS"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges = [var.public_subnet_cidr, var.private_subnet_cidr]
+}
