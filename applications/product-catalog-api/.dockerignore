@@ -1,0 +1,58 @@
+# .dockerignore — Controls what Docker sends to the build context (daemon).
+#
+# A lean build context means:
+#   1. Faster builds (less data transferred to the Docker daemon)
+#   2. Smaller images (accidentally included files can't leak into layers)
+#   3. Better cache utilisation (irrelevant file changes don't bust the cache)
+
+# Python runtime artefacts — never copy compiled bytecode or caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments — dependencies are installed inside the image
+.venv/
+venv/
+env/
+ENV/
+
+# Development tooling
+.env
+.env.*
+*.env
+
+# IDE / editor config
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docker itself — avoid recursive copies
+Dockerfile
+.dockerignore
+
+# Documentation (not needed at runtime)
+README.md
+docs/
+
+# Test files
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Kubernetes manifests — runtime concern, not build concern
+k8s/
+
+# CI/CD
+.github/
