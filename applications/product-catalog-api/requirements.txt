@@ -1,0 +1,19 @@
+# Product Catalog API — Python Dependencies
+#
+# Pin to minor versions (not patch) to get security fixes automatically
+# while avoiding unexpected breaking changes.
+# Exact pinning is done in requirements-lock.txt (generated via pip-compile).
+
+# Web framework
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+
+# Database — async PostgreSQL driver
+sqlalchemy[asyncio]==2.0.*
+asyncpg==0.30.*
+
+# Data validation
+pydantic==2.11.*
+
+# Observability — Prometheus metrics (Phase 5 hook)
+prometheus-client==0.21.*
