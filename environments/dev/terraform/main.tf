@@ -1,4 +1,4 @@
-module "network" {
+﻿module "network" {
   source = "../../../modules/network"
 
   project_id          = var.project_id
@@ -17,7 +17,7 @@ module "iam" {
 }
 
 # ---------------------------------------------------------------------------
-# Artifact Registry — private Docker repository
+# Artifact Registry - private Docker repository
 #
 # The devops-automation-sa (CI/CD) gets writer access so it can push images.
 # GKE node SA will be granted reader access in the GKE module (PR 2.4)
@@ -42,4 +42,4 @@ module "artifact_registry" {
     environment = "dev"
     phase       = "phase2"
   }
-}
+}
