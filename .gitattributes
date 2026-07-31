@@ -1,0 +1,47 @@
+# .gitattributes
+#
+# Ensures consistent line endings across operating systems.
+# Without this, Windows users get CRLF which breaks Terraform's HCL parser.
+#
+# Rule: repository stores LF, checkout behaviour determined by eol setting.
+# `text=auto eol=lf` means: Git normalises to LF on commit, checks out LF everywhere.
+
+# Global default — text files auto-detected
+* text=auto
+
+# Terraform — MUST be LF; CRLF causes HCL "Invalid character" parse errors
+*.tf        text eol=lf
+*.tfvars    text eol=lf
+*.hcl       text eol=lf
+
+# Shell scripts — LF required on Linux/macOS execution environments
+*.sh        text eol=lf
+Makefile    text eol=lf
+
+# Docker
+Dockerfile  text eol=lf
+.dockerignore text eol=lf
+
+# Python
+*.py        text eol=lf
+requirements*.txt text eol=lf
+
+# YAML / JSON / Markdown — LF preferred, no execution concern
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+
+# Windows-specific scripts — keep CRLF
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary files — no line ending conversion
+*.png       binary
+*.jpg       binary
+*.gif       binary
+*.ico       binary
+*.zip       binary
+*.gz        binary
+*.tar       binary
