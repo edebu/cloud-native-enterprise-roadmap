@@ -54,7 +54,7 @@ Python, FastAPI, and standard Linux libraries write logs, cache, or lock files t
 ---
 
 ### 5. Service Type `ClusterIP`
-- **Decision**: Expose the Deployment internally within GKE via a `ClusterIP` service (port 80 pointing to targetPort 8000). External ingress routing is deferred to PR 2.7 (Ingress Controller / LoadBalancer Service).
+- **Decision**: Expose the Deployment internally within GKE via a `ClusterIP` service (port 80 pointing to targetPort 8080). External ingress routing is deferred to PR 2.7 (Ingress Controller / LoadBalancer Service).
 
 ---
 
