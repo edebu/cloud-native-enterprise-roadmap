@@ -56,23 +56,23 @@ graph TD
         GCS["🗄️ GCS Terraform State Bucket"]
     end
 
-    User -->|HTTP (Port 80)| Ingress
-    Ingress -->|Container-Native Load Balancing (NEGs)| Pod1
-    Ingress -->|Container-Native Load Balancing (NEGs)| Pod2
-    Service -.->|Logical Abstraction| Pod1
-    Service -.->|Logical Abstraction| Pod2
+    User -->|"HTTP (Port 80)"| Ingress
+    Ingress -->|"Container-Native Load Balancing (NEGs)"| Pod1
+    Ingress -->|"Container-Native Load Balancing (NEGs)"| Pod2
+    Service -.->|"Logical Abstraction"| Pod1
+    Service -.->|"Logical Abstraction"| Pod2
     
-    Pod1 -->|Private DB Connection| VPC_PEER
-    Pod2 -->|Private DB Connection| VPC_PEER
-    VPC_PEER -->|Peered Access| CloudSQL
+    Pod1 -->|"Private DB Connection"| VPC_PEER
+    Pod2 -->|"Private DB Connection"| VPC_PEER
+    VPC_PEER -->|"Peered Access"| CloudSQL
     
-    GKE -->|Pull Container Images| Registry
-    GKE -->|Outbound Egress| NAT
+    GKE -->|"Pull Container Images"| Registry
+    GKE -->|"Outbound Egress"| NAT
 
-    Local -->|Terraform Plan/Apply| GCS
-    GHA -->|Terraform Plan/Apply| GCS
-    GCS -->|Provisions & Manages| GCP
-    SA -.->|Associated Roles| Roles
+    Local -->|"Terraform Plan/Apply"| GCS
+    GHA -->|"Terraform Plan/Apply"| GCS
+    GCS -->|"Provisions & Manages"| GCP
+    SA -.->|"Associated Roles"| Roles
 ```
 
 ---
