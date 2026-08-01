@@ -11,6 +11,7 @@ metadata:
     # Allow HTTP traffic during development since DNS/SSL is not configured yet.
     # We will enforce SSL redirection and configure HTTPS in Phase 3.
     kubernetes.io/ingress.allow-http: "true"
+    kubernetes.io/ingress.class: "gce"
 spec:
   ingressClassName: gce
   rules:
