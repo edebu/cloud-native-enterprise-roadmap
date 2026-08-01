@@ -1,0 +1,6 @@
+apiVersion: v2
+name: product-catalog-api
+description: A Helm chart for Product Catalog API on Google Kubernetes Engine (GKE)
+type: application
+version: 0.1.0
+appVersion: "v0.1.0"
