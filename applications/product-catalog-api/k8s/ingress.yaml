@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-catalog-api-ingress
+  namespace: cn-er-dev
+  labels:
+    app.kubernetes.io/name: product-catalog-api
+    environment: dev
+    phase: phase2
+  annotations:
+    # Allow HTTP traffic during development since DNS/SSL is not configured yet.
+    # We will enforce SSL redirection and configure HTTPS in Phase 3.
+    kubernetes.io/ingress.allow-http: "true"
+spec:
+  ingressClassName: gce
+  rules:
+  # No host restriction for now to allow accessing via the raw Load Balancer IP.
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: product-catalog-api-service
+            port:
+              number: 80
