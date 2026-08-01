@@ -4,16 +4,16 @@ Production-ready, modular, and cloud-agnostic infrastructure roadmap designed to
 
 ---
 
-## 🏗️ Architecture Overview (Phase 2)
+### 🏗️ Architecture Overview (Phase 3)
 
-Aşağıdaki şema, Phase 2 (Aşama 2) sonunda elde edilen konteynerleştirilmiş uygulama altyapısını, GKE Autopilot private cluster mimarisini, Private Services Access peering entegrasyonunu ve GCP Application Load Balancer (GKE Ingress) ile dış dünyaya güvenli erişim kurgusunu temsil eder.
+Aşağıdaki şema, Phase 3 (Aşama 3) sonunda elde edilen GitOps mimarisini, ArgoCD pull-model deployment kurgusunu, Workload Identity entegrasyonlu External Secrets Operator (ESO) ve GCP Secret Manager bağlantısını temsil eder.
 
 ```mermaid
 graph TD
     subgraph Client ["Client & CI/CD"]
         User["🌐 External User (Internet)"]
         Local["💻 Developer (Local)"]
-        GHA["⚙️ GitHub Actions"]
+        GitRepo["🐙 GitHub Repository<br>(Monorepo: cn-er)"]
     end
 
     subgraph GCP ["Google Cloud Platform Project (spartan-alcove-...)"]
@@ -27,10 +27,24 @@ graph TD
             
             subgraph PrivateSubnet ["Private Subnet (10.10.2.0/24)"]
                 subgraph GKE ["GKE Autopilot Private Cluster (cn-er-dev-autopilot)"]
-                    direction LR
-                    Pod1["📦 product-catalog-api Pod 1<br>(10.236.128.21:8080)"]
-                    Pod2["📦 product-catalog-api Pod 2<br>(10.236.128.22:8080)"]
-                    Service["🔌 ClusterIP Service<br>(Port 80 -> TargetPort 8080)"]
+                    direction TB
+                    
+                    subgraph NS_Argo ["Namespace: argocd"]
+                        ArgoCD["⚙️ ArgoCD Controller & Server"]
+                    end
+
+                    subgraph NS_ESO ["Namespace: external-secrets"]
+                        ESO["🔒 External Secrets Operator"]
+                        KSA_ESO["🔑 KSA: external-secrets"]
+                    end
+
+                    subgraph NS_App ["Namespace: cn-er-dev"]
+                        Pod1["📦 product-catalog-api Pod 1"]
+                        Pod2["📦 product-catalog-api Pod 2"]
+                        Service["🔌 ClusterIP Service"]
+                        ExtSec["🔒 ExternalSecret Resource"]
+                        Secret["🔑 K8s Secret (product-catalog-api-secret)"]
+                    end
                 end
             end
 
@@ -42,13 +56,18 @@ graph TD
             Registry["📦 Docker Repository<br>(app-images/product-catalog-api)"]
         end
 
+        subgraph SecretManager ["GCP Secret Manager"]
+            DBPass["🔑 cn-er-dev-db-password"]
+        end
+
         subgraph ManagedServices ["Google Managed Services Network"]
             CloudSQL["🗄️ Cloud SQL PostgreSQL Instance<br>(Private IP: 10.100.0.3, Port 5432)"]
         end
 
         subgraph IAM ["IAM & Security"]
-            SA["👤 DevOps Service Account<br>(devops-automation-sa)"]
-            Roles["Least-Privilege Roles"]
+            GSA_DevOps["👤 DevOps Service Account<br>(devops-automation-sa)"]
+            GSA_ESO["👤 ESO Service Account<br>(eso-secrets-sa)"]
+            WI["🔗 GKE Workload Identity"]
         end
     end
 
@@ -66,13 +85,22 @@ graph TD
     Pod2 -->|"Private DB Connection"| VPC_PEER
     VPC_PEER -->|"Peered Access"| CloudSQL
     
+    ArgoCD -->|"GitOps Pull Manifests"| GitRepo
+    ArgoCD -->|"Deploys & Syncs"| NS_App
+    
+    ExtSec -.->|"Defines"| Secret
+    Secret -->|"Provides DB_PASS"| Pod1
+    Secret -->|"Provides DB_PASS"| Pod2
+    
+    KSA_ESO -.->|"Impersonates via WI"| GSA_ESO
+    GSA_ESO -->|"Reads Password"| DBPass
+    ESO -.->|"Fetches DBPass & Populates"| Secret
+    
     GKE -->|"Pull Container Images"| Registry
     GKE -->|"Outbound Egress"| NAT
-
+    
     Local -->|"Terraform Plan/Apply"| GCS
-    GHA -->|"Terraform Plan/Apply"| GCS
     GCS -->|"Provisions & Manages"| GCP
-    SA -.->|"Associated Roles"| Roles
 ```
 
 ---
@@ -83,7 +111,7 @@ graph TD
 | :---: | :--- | :---: | :--- |
 | **Phase 1** | IaC, VPC, Cloud NAT, IAM & GCS Backend | Completed | Terraform, GCP, Git |
 | **Phase 2** | Containerization & GKE Cluster (NEG, Ingress, Cloud SQL) | Completed | Docker, GKE, Kubernetes, PostgreSQL |
-| **Phase 3** | GitOps & Continuous Delivery | Planned | ArgoCD, Helm |
+| **Phase 3** | GitOps & Continuous Delivery | Completed | ArgoCD, Helm, External Secrets Operator, Workload Identity |
 | **Phase 4** | Enterprise Observability & Security | Planned | Prometheus, Grafana, Vault |
 | **Phase 5** | Multi-Cloud Agnostic Transformation | Planned | Terraform (AWS/GCP abstraction) |
 
@@ -91,13 +119,18 @@ graph TD
 
 ## 🛠️ Getting Started & Verification
 
-### 1. Provision Infrastructure (Terraform)
-Altyapı modüllerini (Ağ, Artifact Registry, GKE ve Cloud SQL) sırasıyla ayağa kaldırmak için:
+### 1. Provision Infrastructure & Platform Tools (Terraform)
+Altyapı modüllerini ve cluster platform araçlarını (ArgoCD, ESO, IAM) ayağa kaldırmak için:
 
 ```bash
+# Temel Altyapı (Phase 1 & Phase 2 GAR)
 cd environments/dev/terraform
 terraform init
-terraform plan
+terraform apply
+
+# GKE Cluster & Platform Araçları (Phase 2 GKE, ArgoCD, ESO, IAM & Workload Identity)
+cd ../gke
+terraform init
 terraform apply
 ```
 
@@ -107,28 +140,29 @@ Oluşturulan private GKE Autopilot cluster'ına bağlanmak için:
 gcloud container clusters get-credentials cn-er-dev-autopilot --region europe-west3 --project spartan-alcove-450719-n2
 ```
 
-### 3. Deploy Workloads & Ingress (Kubernetes)
-Uygulamayı ve GCP Yük Dengeleyici konfigürasyonunu deploy etmek için:
+### 3. Deploy Platform GitOps Manifests (Kubernetes)
+Secret Store ve GitOps tanımlarını uygulayarak bootstrap sürecini tamamlamak için:
 ```bash
-kubectl apply -f applications/product-catalog-api/k8s/namespace.yaml
-kubectl apply -f applications/product-catalog-api/k8s/configmap.yaml
-kubectl apply -f applications/product-catalog-api/k8s/secret.yaml
-kubectl apply -f applications/product-catalog-api/k8s/deployment.yaml
-kubectl apply -f applications/product-catalog-api/k8s/service.yaml
-kubectl apply -f applications/product-catalog-api/k8s/ingress.yaml
+kubectl apply -f gitops/argo-cd/cluster/cluster-secret-store.yaml
+kubectl apply -f gitops/argo-cd/projects/dev-project.yaml
+kubectl apply -f gitops/argo-cd/apps/product-catalog-api.yaml
 ```
 
-### 4. Verify External Connectivity
-Ingress IP adresini aldıktan sonra (tahsis süresi ~4-6 dakikadır) curl ile endpoint'leri test edin:
+### 4. Verify GitOps & Connectivity
+GitOps durumunu ve harici erişimi test etmek için:
 ```bash
+# ArgoCD Uygulama durumunu doğrulayın
+kubectl get application product-catalog-api -n argocd
+
+# ExternalSecret durumunu kontrol edin (STATUS: SecretSynced olmalıdır)
+kubectl get externalsecret product-catalog-api-secret -n cn-er-dev
+
 # Ingress durumunu ve IP adresini kontrol edin
 kubectl get ingress product-catalog-api-ingress -n cn-er-dev
 
-# API Sağlık durumunu ve veri tabanı bağlantısını kontrol edin
+# API Sağlık durumunu ve veritabanı bağlantısını kontrol edin
 curl -i http://<INGRESS_IP>/health
-
-# Beklenen Yanıt:
-# {"status":"healthy","db_connected":true,"version":"0.1.0"}
+# Beklenen Yanıt: {"status":"healthy","db_connected":true,"version":"0.1.0"}
 ```
 
 ---
@@ -142,6 +176,7 @@ Mevcut ADR dokümanları:
 - [ADR 002: Multi-stage Docker Build](docs/decision-records/002-multi-stage-docker-build.md)
 - [ADR 003: GCP Artifact Registry](docs/decision-records/003-artifact-registry.md)
 - [ADR 004: GKE Autopilot Cluster](docs/decision-records/004-gke-autopilot.md)
-- [ADR 005: Cloud SQL PostgreSQL Integration](docs/decision-records/005-cloud-sql-postgresql.md)
+- [ADR 005: Cloud SQL PostgreSQL Integration](docs/decision-records/005-cloud-sql-private-ip.md)
 - [ADR 006: Kubernetes Deployment Manifests](docs/decision-records/006-kubernetes-manifests.md)
 - [ADR 007: GKE Ingress with GCP Load Balancer](docs/decision-records/007-gke-ingress.md)
+- [ADR 008: GitOps and Secret Management Integration](docs/decision-records/008-gitops-and-secret-management.md)

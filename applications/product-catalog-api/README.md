@@ -10,7 +10,7 @@ This application is intentionally designed to grow across phases:
 | **Phase 2 (PR 2.2)** | Multi-stage Docker build |
 | **Phase 2 (PR 2.6)** | Kubernetes Deployment manifests |
 | **Phase 2 (PR 2.7)** | GKE Ingress configuration with GCP Load Balancer |
-| **Phase 3** | Helm Chart packaging + ArgoCD GitOps |
+| **Phase 3** | Helm Chart packaging + ArgoCD GitOps (Completed) |
 | **Phase 5** | Prometheus `/metrics` scraping + Grafana dashboard |
 
 ---
@@ -392,6 +392,15 @@ GKE Autopilot'ta tüm servisler için varsayılan olarak aktiftir. GKE Standard'
 
 ---
 
+## GitOps & Helm Integration (Phase 3)
+
+Uygulamanın dağıtım süreçleri Helm ve ArgoCD kullanılarak GitOps standartlarına taşınmıştır.
+- **`charts/product-catalog-api/`**: Uygulamanın parametrik şablonlarını içeren Helm paketi.
+- **`templates/externalsecret.yaml`**: Veritabanı şifresini (`DB_PASS`) GCP Secret Manager'dan GKE Workload Identity kullanarak güvenli bir şekilde çekmek için tanımlanan External Secrets Operator (ESO) kaynağı.
+- **GitOps Dağıtımı**: Uygulama artık manuel olarak dağıtılmamakta, kök dizindeki `gitops/argo-cd/` manifestoları yardımıyla ArgoCD tarafından otomatik olarak senkronize edilmektedir.
+
+---
+
 ## File Structure
 
 ```
@@ -405,5 +414,7 @@ applications/product-catalog-api/
 ├── requirements.txt    # Python dependencies (pinned to minor versions)
 ├── Dockerfile          # Multi-stage build (PR 2.2)
 ├── .dockerignore       # Build context exclusions
-└── k8s/                # Kubernetes manifests (Phase 2, PR 2.6)
+├── k8s/                # Static Kubernetes manifests (Phase 2, PR 2.6)
+└── charts/             # Helm Chart package (Phase 3)
+    └── product-catalog-api/
 ```
