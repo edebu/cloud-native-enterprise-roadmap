@@ -90,3 +90,64 @@ resource "google_artifact_registry_repository_iam_member" "gke_node_gar_reader" 
   # Default Compute Engine SA: <project_number>-compute@developer.gserviceaccount.com
   member = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
+
+# ---------------------------------------------------------------------------
+# ArgoCD Deployment via Helm
+# ---------------------------------------------------------------------------
+resource "helm_release" "argocd" {
+  name             = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = "7.3.11"
+  namespace        = "argocd"
+  create_namespace = true
+  timeout          = 900 # 15 minutes for GKE Autopilot node provisioning
+
+  set {
+    name  = "server.extraArgs"
+    value = "{--insecure}"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# External Secrets Operator Deployment via Helm
+# ---------------------------------------------------------------------------
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  version          = "0.9.20"
+  namespace        = "external-secrets"
+  create_namespace = true
+  timeout          = 900 # 15 minutes for GKE Autopilot node provisioning
+
+  set {
+    name  = "installCRDs"
+    value = "true"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# IAM & Workload Identity for External Secrets Operator
+# ---------------------------------------------------------------------------
+
+# GSA for ESO secrets access
+resource "google_service_account" "eso_secrets_sa" {
+  account_id   = "eso-secrets-sa"
+  display_name = "External Secrets Operator GSA for dev GKE"
+  project      = var.project_id
+}
+
+# Grant the GSA access to read Secret Manager secrets
+resource "google_project_iam_member" "eso_secrets_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.eso_secrets_sa.email}"
+}
+
+# Bind GSA to KSA via Workload Identity.
+resource "google_service_account_iam_member" "eso_workload_identity" {
+  service_account_id = google_service_account.eso_secrets_sa.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[external-secrets/external-secrets]"
+}
