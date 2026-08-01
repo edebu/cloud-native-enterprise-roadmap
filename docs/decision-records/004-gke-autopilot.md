@@ -56,7 +56,9 @@ This is a deliberate **learning-phase trade-off**:
 | Setup complexity | Low | High (VPN or IAP setup required) |
 | Security | Acceptable with IP allowlist | Enterprise-grade |
 
-**Decision for dev**: Public endpoint with empty `authorized_networks` (no IP restriction). This allows `kubectl` from any IP without VPN setup.
+**Decision for dev**: Public endpoint. `authorized_networks = []` is now handled by the module with a `0.0.0.0/0` fallback — any IP can reach the control plane.
+
+> **Bug encountered & fixed (PR hotfix):** Initially, `authorized_networks = []` was passed to a `master_authorized_networks_config` block with an empty `cidr_blocks` dynamic block. GKE interpreted this as: *"only GCP internal IPs allowed"* — not *"unrestricted"*. External `kubectl` calls timed out at port 443. Fixed by adding a `locals` block that substitutes `0.0.0.0/0` when the list is empty. This is a real-world Terraform gotcha worth remembering.
 
 > **Production upgrade path**: Set `enable_private_endpoint = true` and access via `gcloud container clusters get-credentials --internal-ip` through an IAP tunnel or bastion. This will be addressed in a future phase.
 

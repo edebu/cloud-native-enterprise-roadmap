@@ -31,6 +31,22 @@ resource "google_project_service" "container_api" {
 # ---------------------------------------------------------------------------
 # GKE Autopilot Cluster
 # ---------------------------------------------------------------------------
+locals {
+  # ---------------------------------------------------------------------------
+  # Authorized networks fallback
+  #
+  # GKE behaviour when master_authorized_networks_config is set:
+  #   - cidr_blocks = []  → ONLY gcp_public_cidrs allowed → developers LOCKED OUT
+  #   - cidr_blocks = [{0.0.0.0/0}] → anyone can reach the control plane
+  #
+  # We want empty var = "no restriction" (dev convenience). Production callers
+  # should always pass explicit CIDR blocks (e.g. VPN egress, Cloud Build SA).
+  # ---------------------------------------------------------------------------
+  effective_authorized_networks = length(var.authorized_networks) == 0 ? [
+    { cidr_block = "0.0.0.0/0", display_name = "allow-all-dev" }
+  ] : var.authorized_networks
+}
+
 resource "google_container_cluster" "main" {
   name     = var.cluster_name
   location = var.region
@@ -73,16 +89,19 @@ resource "google_container_cluster" "main" {
 
   # ---------------------------------------------------------------------------
   # Control plane access restriction
+  #
+  # Uses local.effective_authorized_networks so that an empty var produces
+  # 0.0.0.0/0 (open) rather than silently locking out all external IPs.
   # ---------------------------------------------------------------------------
   master_authorized_networks_config {
     dynamic "cidr_blocks" {
-      for_each = var.authorized_networks
+      for_each = local.effective_authorized_networks
       content {
         cidr_block   = cidr_blocks.value.cidr_block
         display_name = cidr_blocks.value.display_name
       }
     }
-    # Allow GCP internal services (Cloud Build, etc.) to reach the control plane.
+    # Allow GCP-internal services (Cloud Shell, Cloud Build) to always connect.
     gcp_public_cidrs_access_enabled = true
   }
 
