@@ -6,6 +6,10 @@ metadata:
   labels:
     app.kubernetes.io/name: product-catalog-api
     environment: dev
+  annotations:
+    # Explicitly enable Network Endpoint Groups (NEG) for Container-Native Load Balancing.
+    # This ensures the NEG is created immediately when the Service is provisioned.
+    cloud.google.com/neg: '{"ingress": true}'
 spec:
   type: ClusterIP
   ports:
