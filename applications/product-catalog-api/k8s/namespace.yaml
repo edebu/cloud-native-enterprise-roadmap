@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cn-er-dev
+  labels:
+    environment: dev
+    managed-by: manual-gitops
+    phase: phase2
