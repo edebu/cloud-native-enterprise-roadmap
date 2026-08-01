@@ -9,6 +9,7 @@ This application is intentionally designed to grow across phases:
 | **Phase 2 (PR 2.1)** | Core CRUD + DB connection (this PR) |
 | **Phase 2 (PR 2.2)** | Multi-stage Docker build |
 | **Phase 2 (PR 2.6)** | Kubernetes Deployment manifests |
+| **Phase 2 (PR 2.7)** | GKE Ingress configuration with GCP Load Balancer |
 | **Phase 3** | Helm Chart packaging + ArgoCD GitOps |
 | **Phase 5** | Prometheus `/metrics` scraping + Grafana dashboard |
 
@@ -272,6 +273,122 @@ docker logs api-test   # "Shutting down" mesajını ara
 4. **`.dockerignore`** — build context'e gereksiz dosya girişi engellenir; yanlışlıkla `.env` veya credential dosyası imaja karışmaz.
 5. **Layer caching** — `COPY requirements.txt` önce, `COPY src/` sonra: kod değişikliklerinde `pip install` tekrar çalışmaz.
 6. **Trivy ile tarama** (Phase 3'te CI'a entegre edilecek): `trivy image product-catalog-api:local`
+
+---
+
+## Kubernetes Deployment (Phase 2, PR 2.6)
+
+Exposes the Product Catalog API container to a GKE Autopilot private cluster with enterprise-grade security hardening:
+- **`namespace.yaml`**: Dedicated `cn-er-dev` namespace for workload isolation.
+- **`configmap.yaml`**: Sourced DB variables (`DB_HOST` pointing to Private IP `10.100.0.3`, `DB_NAME`, `DB_USER`, `DB_PORT`).
+- **`secret.yaml`**: Base64 encoded DB password value from GCP Secret Manager (foundation for External Secrets Operator in Phase 4).
+- **`deployment.yaml`**:
+  - Replicas: 2
+  - Resource Sizing matching GKE Autopilot requirements: `250m` CPU, `512Mi` Memory.
+  - Security Context: `runAsNonRoot=true`, `runAsUser=10001`, `allowPrivilegeEscalation=false`, `readOnlyRootFilesystem=true`, `capabilities.drop=["ALL"]`.
+  - Probes: `livenessProbe` and `readinessProbe` checking `/health` on containerPort `8080`.
+  - Volume: `emptyDir` mounted at `/tmp` to allow Python/FastAPI temporary writes without writing to container layer.
+- **`service.yaml`**: `ClusterIP` exposing deployment on internal port `80` targeting port `8080` in pods.
+
+---
+
+## ✅ Verification Checklist (PR 2.6)
+
+### Step 1 — Verify manifests exist
+```bash
+ls applications/product-catalog-api/k8s/
+```
+
+### Step 2 — Deploy resources
+```bash
+kubectl apply -f applications/product-catalog-api/k8s/namespace.yaml
+kubectl apply -f applications/product-catalog-api/k8s/configmap.yaml
+kubectl apply -f applications/product-catalog-api/k8s/secret.yaml
+kubectl apply -f applications/product-catalog-api/k8s/deployment.yaml
+kubectl apply -f applications/product-catalog-api/k8s/service.yaml
+```
+
+### Step 3 — Verify deployment status
+```bash
+kubectl rollout status deployment/product-catalog-api -n cn-er-dev --timeout=180s
+```
+
+### Step 4 — Check pods and logs
+```bash
+kubectl get pods -n cn-er-dev
+kubectl logs deployment/product-catalog-api -c api -n cn-er-dev --tail=50
+```
+
+**Beklenen çıktı:** 2 podun da `Running` ve `1/1 Ready` olması, loglarda veritabanı bağlantısının başarılı kurulduğunu gösteren `Database connection successful` mesajının görünmesi.
+
+---
+
+## 🎯 Mülakat Sorusu (PR 2.6)
+
+**S: Kubernetes üzerinde `readOnlyRootFilesystem: true` aktif edildiğinde uygulama neden crash'e düşebilir ve bunu çözmek için ne yapmak gerekir?**
+
+**C:** Birçok web framework veya kütüphanesi çalışma anında geçici dosyalar (örn: geçici loglar, bytecode cache'leri, upload edilen dosyalar) yazmak ister (`/tmp` veya `.pyc` oluşturma). Root filesystem salt-okunur olduğunda bu yazma işlemleri hata verir ve uygulama crash loop'a girer. 
+Çözüm olarak, yazma işlemi yapılması gereken dizinler (örn: `/tmp`) pod tanımında bir `emptyDir` volume'u olarak tanımlanıp ilgili path'e mount edilmelidir. `emptyDir` bellek (RAM) veya düğümün geçici disk alanı üzerinde (node'un local diskinde) geçici bir alan açarak yazma yetkisi sağlar.
+
+---
+
+---
+
+## GKE Ingress & Load Balancing (Phase 2, PR 2.7)
+
+Uygulamayı harici dünyaya açmak için GCP Application Load Balancer (`gce` Ingress class) entegrasyonu:
+- **`ingress.yaml`**: `ingressClassName: gce` kullanarak GCP HTTP(S) Load Balancer oluşturur.
+- **Annotations**:
+  - `kubernetes.io/ingress.allow-http: "true"`: Dev aşamasında DNS/SSL kurulmadan önce HTTP erişimine izin verir (Phase 3'te HTTPS zorunlu kılınacak).
+  - `kubernetes.io/ingress.class: "gce"`: Ingress controller tetiklenmesini garanti altına alır.
+- **`defaultBackend`**: `product-catalog-api-service` olarak ayarlandı. Böylece GKE Autopilot'un varsayılan default-http-backend NEG'siyle olan senkronizasyon hataları (RESOURCE_NOT_FOUND) baypas edilmiş oldu.
+
+---
+
+## ✅ Verification Checklist (PR 2.7)
+
+### Step 1 — Deploy Ingress
+```bash
+kubectl apply -f applications/product-catalog-api/k8s/ingress.yaml
+```
+
+### Step 2 — Monitor IP allocation
+```bash
+kubectl get ingress product-catalog-api-ingress -n cn-er-dev --watch
+```
+*(Yük dengeleyicinin oluşturulması ve IP adresi atanması 4-6 dakika sürebilir).*
+
+### Step 3 — Smoke test external endpoints
+IP adresi tahsis edildikten sonra dış dünyadan (örneğin lokal makinenizden) API'yi test edin:
+```bash
+# Health endpoint testi
+curl -i http://<INGRESS_IP>/health
+
+# Beklenen Çıktı:
+# {"status":"healthy","db_connected":true,"version":"0.1.0"}
+
+# Products listeleme endpoint testi
+curl -i http://<INGRESS_IP>/products
+
+# Beklenen Çıktı:
+# {"items":[],"total":0,"page":1,"page_size":20}
+```
+
+---
+
+## 🎯 Mülakat Sorusu (PR 2.7)
+
+**S: GKE üzerinde "Container-Native Load Balancing" nedir, avantajları nelerdir ve nasıl aktif edilir?**
+
+**C:** Container-Native Load Balancing, GCP Load Balancer'ın trafiği cluster node'larına (VM) değil, doğrudan Kubernetes **Pod IP**'lerine yönlendirmesini sağlayan mimaridir. GKE arka planda her Service için bir **NEG (Network Endpoint Group)** oluşturur ve Load Balancer backend'i olarak bu NEG'yi atar.
+
+**Avantajları:**
+1. **Düşük Latency (Single-Hop):** Trafik NodePort veya `kube-proxy` (iptables/ipvs) üzerinden tekrar yönlendirilmez. Load Balancer'dan doğrudan pod'a gider.
+2. **Doğru Health Check:** Load Balancer doğrudan pod'un sağlığını kontrol eder. Node'un sağlığı ile pod'un sağlığı ayrıştırılmış olur.
+3. **İdeal Trafik Dağılımı:** VM başına değil, Pod başına eşit yük dağılımı sağlanır.
+
+**Nasıl Aktif Edilir:**
+GKE Autopilot'ta tüm servisler için varsayılan olarak aktiftir. GKE Standard'da ise Service manifestine `cloud.google.com/neg: '{"ingress": true}'` anotasyonu eklenerek kolayca aktif edilebilir.
 
 ---
 

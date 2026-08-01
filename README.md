@@ -4,44 +4,74 @@ Production-ready, modular, and cloud-agnostic infrastructure roadmap designed to
 
 ---
 
-## 🏗️ Architecture Overview (Phase 1)
+## 🏗️ Architecture Overview (Phase 2)
 
-Aşağıdaki şema, Aşama 1 kapsamında kurulan güvenli kurumsal ağ topolojisini, GCS remote backend yapısını ve least-privilege IAM sınırlarını temsil eder.
+Aşağıdaki şema, Phase 2 (Aşama 2) sonunda elde edilen konteynerleştirilmiş uygulama altyapısını, GKE Autopilot private cluster mimarisini, Private Services Access peering entegrasyonunu ve GCP Application Load Balancer (GKE Ingress) ile dış dünyaya güvenli erişim kurgusunu temsil eder.
 
 ```mermaid
 graph TD
     subgraph Client ["Client & CI/CD"]
+        User["🌐 External User (Internet)"]
         Local["💻 Developer (Local)"]
         GHA["⚙️ GitHub Actions"]
     end
-    
-    subgraph Backend ["Remote State Management"]
-        GCS["🗄️ Google Cloud Storage Bucket<br>(State Storage & Object Locking)"]
-    end
-    
-    subgraph GCP ["Google Cloud Platform Project"]
+
+    subgraph GCP ["Google Cloud Platform Project (spartan-alcove-...)"]
+        
+        subgraph GLB ["GCP External Application Load Balancer"]
+            Ingress["🕸️ GKE Ingress (GCE class)<br>(External IP: 136.68.246.128)"]
+        end
+
         subgraph VPC ["Enterprise VPC (dev-enterprise-vpc)"]
             direction TB
-            subgraph PublicSubnet ["Public Subnet (10.10.1.0/24)"]
-                PUB_RES["Public Resources"]
-            end
+            
             subgraph PrivateSubnet ["Private Subnet (10.10.2.0/24)"]
-                PRIV_RES["Private Workloads"]
+                subgraph GKE ["GKE Autopilot Private Cluster (cn-er-dev-autopilot)"]
+                    direction LR
+                    Pod1["📦 product-catalog-api Pod 1<br>(10.236.128.21:8080)"]
+                    Pod2["📦 product-catalog-api Pod 2<br>(10.236.128.22:8080)"]
+                    Service["🔌 ClusterIP Service<br>(Port 80 -> TargetPort 8080)"]
+                end
             end
-            NAT["🌐 Cloud NAT & Cloud Router<br>(Secure Egress for Private Subnet)"]
-            FW["🛡️ Firewall Rules<br>- Allow Internal Traffic<br>- Deny External SSH (Port 22)"]
+
+            NAT["🌐 Cloud NAT & Cloud Router<br>(Secure Outbound Egress)"]
+            VPC_PEER["🔗 Private Services Access (VPC Peering)"]
         end
-        
+
+        subgraph GAR ["Google Artifact Registry"]
+            Registry["📦 Docker Repository<br>(app-images/product-catalog-api)"]
+        end
+
+        subgraph ManagedServices ["Google Managed Services Network"]
+            CloudSQL["🗄️ Cloud SQL PostgreSQL Instance<br>(Private IP: 10.100.0.3, Port 5432)"]
+        end
+
         subgraph IAM ["IAM & Security"]
             SA["👤 DevOps Service Account<br>(devops-automation-sa)"]
-            Roles["Least-Privilege Roles:<br>- Storage Object Viewer<br>- Logging Log Writer"]
+            Roles["Least-Privilege Roles"]
         end
     end
+
+    subgraph Backend ["Remote State Management"]
+        GCS["🗄️ GCS Terraform State Bucket"]
+    end
+
+    User -->|HTTP (Port 80)| Ingress
+    Ingress -->|Container-Native Load Balancing (NEGs)| Pod1
+    Ingress -->|Container-Native Load Balancing (NEGs)| Pod2
+    Service -.->|Logical Abstraction| Pod1
+    Service -.->|Logical Abstraction| Pod2
     
+    Pod1 -->|Private DB Connection| VPC_PEER
+    Pod2 -->|Private DB Connection| VPC_PEER
+    VPC_PEER -->|Peered Access| CloudSQL
+    
+    GKE -->|Pull Container Images| Registry
+    GKE -->|Outbound Egress| NAT
+
     Local -->|Terraform Plan/Apply| GCS
     GHA -->|Terraform Plan/Apply| GCS
     GCS -->|Provisions & Manages| GCP
-    PrivateSubnet -->|Outbound Traffic| NAT
     SA -.->|Associated Roles| Roles
 ```
 
@@ -52,53 +82,66 @@ graph TD
 | Phase | Topic | Status | Technologies |
 | :---: | :--- | :---: | :--- |
 | **Phase 1** | IaC, VPC, Cloud NAT, IAM & GCS Backend | Completed | Terraform, GCP, Git |
-| **Phase 2** | Containerization & GKE Cluster | In Progress | Docker, GKE, Kubernetes |
+| **Phase 2** | Containerization & GKE Cluster (NEG, Ingress, Cloud SQL) | Completed | Docker, GKE, Kubernetes, PostgreSQL |
 | **Phase 3** | GitOps & Continuous Delivery | Planned | ArgoCD, Helm |
 | **Phase 4** | Enterprise Observability & Security | Planned | Prometheus, Grafana, Vault |
 | **Phase 5** | Multi-Cloud Agnostic Transformation | Planned | Terraform (AWS/GCP abstraction) |
 
 ---
 
-## 🛠️ Getting Started (Phase 1)
+## 🛠️ Getting Started & Verification
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/edebu/cloud-native-enterprise-roadmap.git
-   cd cloud-native-enterprise-roadmap/environments/dev/terraform
-   ```
+### 1. Provision Infrastructure (Terraform)
+Altyapı modüllerini (Ağ, Artifact Registry, GKE ve Cloud SQL) sırasıyla ayağa kaldırmak için:
 
-2. **Initialize Terraform with GCS Backend:**
+```bash
+cd environments/dev/terraform
+terraform init
+terraform plan
+terraform apply
+```
 
-    ```bash
-    terraform init
-    ```
+### 2. Connect to GKE Cluster
+Oluşturulan private GKE Autopilot cluster'ına bağlanmak için:
+```bash
+gcloud container clusters get-credentials cn-er-dev-autopilot --region europe-west3 --project spartan-alcove-450719-n2
+```
 
-3. **Apply Infrastructure:**
+### 3. Deploy Workloads & Ingress (Kubernetes)
+Uygulamayı ve GCP Yük Dengeleyici konfigürasyonunu deploy etmek için:
+```bash
+kubectl apply -f applications/product-catalog-api/k8s/namespace.yaml
+kubectl apply -f applications/product-catalog-api/k8s/configmap.yaml
+kubectl apply -f applications/product-catalog-api/k8s/secret.yaml
+kubectl apply -f applications/product-catalog-api/k8s/deployment.yaml
+kubectl apply -f applications/product-catalog-api/k8s/service.yaml
+kubectl apply -f applications/product-catalog-api/k8s/ingress.yaml
+```
 
-    ```bash
-    terraform plan
-    terraform apply
-    ```
+### 4. Verify External Connectivity
+Ingress IP adresini aldıktan sonra (tahsis süresi ~4-6 dakikadır) curl ile endpoint'leri test edin:
+```bash
+# Ingress durumunu ve IP adresini kontrol edin
+kubectl get ingress product-catalog-api-ingress -n cn-er-dev
 
-## 🗂️ Architecture Decision Records (ADRs)
+# API Sağlık durumunu ve veri tabanı bağlantısını kontrol edin
+curl -i http://<INGRESS_IP>/health
 
-For detailed technical decisions and architectural choices, please refer to the [Architecture Decision Records (ADRs)](docs/decision-records/) directory.
-
-Key ADRs include:
-- [ADR 001: Remote GCS Backend and Cloud NAT](docs/decision-records/001-gcs-backend-and-cloud-nat.md)
+# Beklenen Yanıt:
+# {"status":"healthy","db_connected":true,"version":"0.1.0"}
+```
 
 ---
 
-### Adım 4: Commit ve PR İşlemleri
+## 🗂️ Architecture Decision Records (ADRs)
 
-Tüm bu dokümantasyon dosyaları hazır olduğunda, repoyu commit'leyip PR aşamasına geçebiliriz:
+Detaylı teknik kararlar ve mimari seçimler için [Architecture Decision Records (ADRs)](docs/decision-records/) dizinini inceleyebilirsiniz.
 
-```bash
-# Değişiklikleri ekle
-git add .
-
-# Commit et
-git commit -m "docs: add enterprise-grade README, architecture summary, and ADR 001"
-
-# GitHub'a gönder
-git push -u origin feature/phase1-documentation-and-adr
+Mevcut ADR dokümanları:
+- [ADR 001: Remote GCS Backend and Cloud NAT](docs/decision-records/001-gcs-backend-and-cloud-nat.md)
+- [ADR 002: Multi-stage Docker Build](docs/decision-records/002-multi-stage-docker-build.md)
+- [ADR 003: GCP Artifact Registry](docs/decision-records/003-artifact-registry.md)
+- [ADR 004: GKE Autopilot Cluster](docs/decision-records/004-gke-autopilot.md)
+- [ADR 005: Cloud SQL PostgreSQL Integration](docs/decision-records/005-cloud-sql-postgresql.md)
+- [ADR 006: Kubernetes Deployment Manifests](docs/decision-records/006-kubernetes-manifests.md)
+- [ADR 007: GKE Ingress with GCP Load Balancer](docs/decision-records/007-gke-ingress.md)
