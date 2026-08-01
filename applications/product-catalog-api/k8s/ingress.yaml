@@ -14,6 +14,11 @@ metadata:
     kubernetes.io/ingress.class: "gce"
 spec:
   ingressClassName: gce
+  defaultBackend:
+    service:
+      name: product-catalog-api-service
+      port:
+        number: 80
   rules:
   # No host restriction for now to allow accessing via the raw Load Balancer IP.
   - http:
