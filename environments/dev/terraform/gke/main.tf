@@ -125,6 +125,11 @@ resource "helm_release" "external_secrets" {
     name  = "installCRDs"
     value = "true"
   }
+
+  set {
+    name  = "serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account"
+    value = "eso-secrets-sa@${var.project_id}.iam.gserviceaccount.com"
+  }
 }
 
 # ---------------------------------------------------------------------------

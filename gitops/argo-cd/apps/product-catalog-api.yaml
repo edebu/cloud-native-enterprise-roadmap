@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: product-catalog-api
+  namespace: argocd
+spec:
+  project: dev-project
+  source:
+    repoURL: https://github.com/edebu/cloud-native-enterprise-roadmap.git
+    targetRevision: main
+    path: applications/product-catalog-api/charts/product-catalog-api
+    helm:
+      valueFiles:
+      - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cn-er-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
