@@ -1,0 +1,60 @@
+# Default values for product-catalog-api.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+image:
+  repository: europe-west3-docker.pkg.dev/spartan-alcove-450719-n2/app-images/product-catalog-api
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v0.1.0"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+
+ingress:
+  enabled: true
+  className: gce
+  annotations:
+    kubernetes.io/ingress.allow-http: "true"
+    kubernetes.io/ingress.class: "gce"
+  # No host restriction for dev to allow accessing via the raw Load Balancer IP.
+  hosts: []
+
+config:
+  dbHost: "10.100.0.3"
+  dbName: "productdb"
+  dbUser: "appuser"
+  dbPort: "5432"
+
+secret:
+  name: product-catalog-api-secret
+  key: DB_PASSWORD
+
+resources:
+  limits:
+    cpu: "250m"
+    memory: "512Mi"
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL

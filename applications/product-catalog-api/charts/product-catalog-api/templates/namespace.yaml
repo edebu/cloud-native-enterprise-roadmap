@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    environment: {{ .Values.environment | default "dev" }}
+    managed-by: helm
+    phase: phase3
