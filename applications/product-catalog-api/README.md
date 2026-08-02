@@ -11,7 +11,7 @@ This application is intentionally designed to grow across phases:
 | **Phase 2 (PR 2.6)** | Kubernetes Deployment manifests |
 | **Phase 2 (PR 2.7)** | GKE Ingress configuration with GCP Load Balancer |
 | **Phase 3** | Helm Chart packaging + ArgoCD GitOps (Completed) |
-| **Phase 5** | Prometheus `/metrics` scraping + Grafana dashboard |
+| **Phase 4** | Prometheus metrics + Grafana dashboard + Vault integration (Completed) |
 
 ---
 
@@ -20,8 +20,8 @@ This application is intentionally designed to grow across phases:
 ```
 FastAPI App (uvicorn)
 ├── /health         → DB ping — used as K8s liveness/readiness probe
-├── /metrics        → Prometheus exposition format (Phase 5)
-├── /simulate-load  → CPU-bound loop for load testing (Phase 5)
+├── /metrics        → Prometheus exposition format (Phase 4)
+├── /simulate-load  → CPU-bound loop for load testing (Phase 4)
 └── /products       → CRUD (PostgreSQL via SQLAlchemy async)
 ```
 
@@ -405,7 +405,16 @@ GKE Autopilot'ta tüm servisler için varsayılan olarak aktiftir. GKE Standard'
 Uygulamanın dağıtım süreçleri Helm ve ArgoCD kullanılarak GitOps standartlarına taşınmıştır.
 - **`charts/product-catalog-api/`**: Uygulamanın parametrik şablonlarını içeren Helm paketi.
 - **`templates/externalsecret.yaml`**: Veritabanı şifresini (`DB_PASS`) GCP Secret Manager'dan GKE Workload Identity kullanarak güvenli bir şekilde çekmek için tanımlanan External Secrets Operator (ESO) kaynağı.
-- **GitOps Dağıtımı**: Uygulama artık manuel olarak dağıtılmamakta, kök dizindeki `gitops/argo-cd/` manifestoları yardımıyla ArgoCD tarafından otomatik olarak senkronize edilmektedir.
+- GitOps Dağıtımı: Uygulama artık manuel olarak dağıtılmamakta, kök dizindeki `gitops/argo-cd/` manifestoları yardımıyla ArgoCD tarafından otomatik olarak senkronize edilmektedir.
+
+---
+
+## Observability & Security Integration (Phase 4)
+
+Uygulamanın gözlemlenebilirlik (observability) ve güvenlik (security) standartları Phase 4 kapsamında artırılmıştır:
+- **Metrics & ServiceMonitor**: FastAPI uygulamasının `/metrics` endpoint'i üzerinden sunduğu Prometheus metriklerini toplamak amacıyla `templates/servicemonitor.yaml` tanımı yapılmıştır.
+- **Grafana Dashboard**: Uygulama sağlığını ve performans metriklerini (HTTP requests, latency, CPU, memory) izlemek üzere tasarlanan Grafana paneli, Helm şablonları içerisinde bir ConfigMap (`templates/grafana-dashboard.yaml`) olarak sunulmuş ve Grafana sidecar'ı tarafından otomatik olarak keşfedilmiştir.
+- **HashiCorp Vault Entegrasyonu**: Veritabanı şifresi (`DB_PASS`), External Secrets Operator (ESO) aracılığıyla HashiCorp Vault'tan (`vault-cluster-secret-store`) güvenli bir şekilde çekilmektedir. Uygulama Helm değerleri (`values.yaml`) üzerinden hem GCP Secret Manager hem de Vault entegrasyonu esnek şekilde kontrol edilebilmektedir.
 
 ---
 

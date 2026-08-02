@@ -38,6 +38,15 @@ graph TD
                         KSA_ESO["🔑 KSA: external-secrets"]
                     end
 
+                    subgraph NS_Vault ["Namespace: vault"]
+                        Vault["🔐 HashiCorp Vault (Raft Storage)"]
+                    end
+
+                    subgraph NS_Mon ["Namespace: monitoring"]
+                        Prom["📊 Prometheus Server"]
+                        Grafana["📈 Grafana Dashboards"]
+                    end
+
                     subgraph NS_App ["Namespace: cn-er-dev"]
                         Pod1["📦 product-catalog-api Pod 1"]
                         Pod2["📦 product-catalog-api Pod 2"]
@@ -96,6 +105,13 @@ graph TD
     GSA_ESO -->|"Reads Password"| DBPass
     ESO -.->|"Fetches DBPass & Populates"| Secret
     
+    KSA_ESO -->|"Kubernetes Auth"| Vault
+    ESO -->|"Pulls Secrets"| Vault
+    
+    Prom -->|"Scrapes Metrics (/metrics)"| Pod1
+    Prom -->|"Scrapes Metrics (/metrics)"| Pod2
+    Grafana -->|"Queries Metrics"| Prom
+    
     GKE -->|"Pull Container Images"| Registry
     GKE -->|"Outbound Egress"| NAT
     
@@ -112,7 +128,7 @@ graph TD
 | **Phase 1** | IaC, VPC, Cloud NAT, IAM & GCS Backend | Completed | Terraform, GCP, Git |
 | **Phase 2** | Containerization & GKE Cluster (NEG, Ingress, Cloud SQL) | Completed | Docker, GKE, Kubernetes, PostgreSQL |
 | **Phase 3** | GitOps & Continuous Delivery | Completed | ArgoCD, Helm, External Secrets Operator, Workload Identity |
-| **Phase 4** | Enterprise Observability & Security | Planned | Prometheus, Grafana, Vault |
+| **Phase 4** | Enterprise Observability & Security | Completed | Prometheus, Grafana, Vault |
 | **Phase 5** | Multi-Cloud Agnostic Transformation | Planned | Terraform (AWS/GCP abstraction) |
 
 ---
