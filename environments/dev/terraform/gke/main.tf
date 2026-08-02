@@ -103,10 +103,53 @@ resource "helm_release" "argocd" {
   create_namespace = true
   timeout          = 900 # 15 minutes for GKE Autopilot node provisioning
 
-  set {
-    name  = "server.extraArgs"
-    value = "{--insecure}"
-  }
+  values = [
+    yamlencode({
+      controller = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      dex = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      redis = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      server = {
+        extraArgs = ["--insecure"]
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      repoServer = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      applicationSet = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      notifications = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+    })
+  ]
 }
 
 # ---------------------------------------------------------------------------
@@ -121,15 +164,32 @@ resource "helm_release" "external_secrets" {
   create_namespace = true
   timeout          = 900 # 15 minutes for GKE Autopilot node provisioning
 
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account"
-    value = "eso-secrets-sa@${var.project_id}.iam.gserviceaccount.com"
-  }
+  values = [
+    yamlencode({
+      installCRDs = true
+      serviceAccount = {
+        annotations = {
+          "iam.gke.io/gcp-service-account" = "eso-secrets-sa@${var.project_id}.iam.gserviceaccount.com"
+        }
+      }
+      resources = {
+        requests = { cpu = "50m", memory = "256Mi" }
+        limits   = { cpu = "200m", memory = "512Mi" }
+      }
+      webhook = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+      certController = {
+        resources = {
+          requests = { cpu = "50m", memory = "256Mi" }
+          limits   = { cpu = "200m", memory = "512Mi" }
+        }
+      }
+    })
+  ]
 }
 
 # ---------------------------------------------------------------------------
@@ -179,6 +239,28 @@ resource "helm_release" "prometheus_stack" {
         tls = {
           enabled = false
         }
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "256Mi"
+          }
+          limits = {
+            cpu    = "200m"
+            memory = "512Mi"
+          }
+        }
+        prometheusConfigReloader = {
+          resources = {
+            requests = {
+              cpu    = "50m"
+              memory = "128Mi"
+            }
+            limits = {
+              cpu    = "100m"
+              memory = "256Mi"
+            }
+          }
+        }
       }
       prometheus = {
         prometheusSpec = {
@@ -186,6 +268,16 @@ resource "helm_release" "prometheus_stack" {
           storageSpec = {
             emptyDir = {
               medium = "Memory"
+            }
+          }
+          resources = {
+            requests = {
+              cpu    = "150m"
+              memory = "512Mi"
+            }
+            limits = {
+              cpu    = "300m"
+              memory = "1Gi"
             }
           }
         }
@@ -197,6 +289,16 @@ resource "helm_release" "prometheus_stack" {
               medium = "Memory"
             }
           }
+          resources = {
+            requests = {
+              cpu    = "100m"
+              memory = "256Mi"
+            }
+            limits = {
+              cpu    = "200m"
+              memory = "512Mi"
+            }
+          }
         }
       }
       # Disable node-exporter daemonset (host access restrictions on Autopilot)
@@ -204,8 +306,18 @@ resource "helm_release" "prometheus_stack" {
         enabled = false
       }
       # Enable kube-state-metrics
-      kubeStateMetrics = {
+      "kube-state-metrics" = {
         enabled = true
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "256Mi"
+          }
+          limits = {
+            cpu    = "200m"
+            memory = "512Mi"
+          }
+        }
       }
       # Disable control plane scraping (managed GKE control plane is unreachable)
       kubelet = {
@@ -234,6 +346,16 @@ resource "helm_release" "prometheus_stack" {
       }
       # Grafana sidecar configuration to automatically load dashboards from ConfigMaps
       grafana = {
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "256Mi"
+          }
+          limits = {
+            cpu    = "200m"
+            memory = "512Mi"
+          }
+        }
         sidecar = {
           dashboards = {
             enabled    = true
