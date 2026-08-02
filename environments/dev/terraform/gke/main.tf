@@ -369,3 +369,63 @@ resource "helm_release" "prometheus_stack" {
   ]
 }
 
+# ---------------------------------------------------------------------------
+# HashiCorp Vault Deployment via Helm
+# ---------------------------------------------------------------------------
+resource "helm_release" "vault" {
+  name             = "vault"
+  repository       = "https://helm.releases.hashicorp.com"
+  chart            = "vault"
+  version          = "0.28.1"
+  namespace        = "vault"
+  create_namespace = true
+  timeout          = 900 # 15 minutes for GKE Autopilot node provisioning
+
+  values = [
+    yamlencode({
+      global = {
+        enabled = true
+      }
+      server = {
+        ha = {
+          enabled  = true
+          replicas = 1
+          raft = {
+            enabled   = true
+            setNodeId = true
+            config    = <<-EOT
+              ui = true
+              listener "tcp" {
+                tls_disable = 1
+                address     = "[::]:8200"
+                cluster_address = "[::]:8201"
+              }
+              storage "raft" {
+                path    = "/vault/data"
+              }
+            EOT
+          }
+        }
+        resources = {
+          requests = {
+            cpu    = "500m"
+            memory = "512Mi"
+          }
+          limits = {
+            cpu    = "500m"
+            memory = "1Gi"
+          }
+        }
+        dataStorage = {
+          enabled      = true
+          size         = "2Gi"
+          storageClass = "standard-rwo"
+        }
+      }
+      ui = {
+        enabled = true
+      }
+    })
+  ]
+}
+
