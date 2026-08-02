@@ -156,3 +156,93 @@ resource "google_service_account_iam_member" "eso_workload_identity" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "serviceAccount:${var.project_id}.svc.id.goog[external-secrets/external-secrets]"
 }
+
+# ---------------------------------------------------------------------------
+# Enterprise Observability: Prometheus & Grafana via Helm
+# ---------------------------------------------------------------------------
+resource "helm_release" "prometheus_stack" {
+  name             = "kube-prometheus-stack"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "kube-prometheus-stack"
+  version          = "61.9.0"
+  namespace        = "monitoring"
+  create_namespace = true
+  timeout          = 900 # 15 minutes for GKE Autopilot pod provisioning
+
+  values = [
+    yamlencode({
+      # Disable components not compatible/allowed in GKE Autopilot
+      prometheusOperator = {
+        admissionWebhooks = {
+          enabled = false
+        }
+        tls = {
+          enabled = false
+        }
+      }
+      prometheus = {
+        prometheusSpec = {
+          # Use emptyDir for ephemeral dev storage to avoid persistent disk costs/quotas
+          storageSpec = {
+            emptyDir = {
+              medium = "Memory"
+            }
+          }
+        }
+      }
+      alertmanager = {
+        alertmanagerSpec = {
+          storageSpec = {
+            emptyDir = {
+              medium = "Memory"
+            }
+          }
+        }
+      }
+      # Disable node-exporter daemonset (host access restrictions on Autopilot)
+      nodeExporter = {
+        enabled = false
+      }
+      # Enable kube-state-metrics
+      kubeStateMetrics = {
+        enabled = true
+      }
+      # Disable control plane scraping (managed GKE control plane is unreachable)
+      kubelet = {
+        enabled = false
+      }
+      kubeApiServer = {
+        enabled = false
+      }
+      kubeControllerManager = {
+        enabled = false
+      }
+      kubeScheduler = {
+        enabled = false
+      }
+      kubeEtcd = {
+        enabled = false
+      }
+      kubeProxy = {
+        enabled = false
+      }
+      coreDns = {
+        enabled = false
+      }
+      kubeDns = {
+        enabled = false
+      }
+      # Grafana sidecar configuration to automatically load dashboards from ConfigMaps
+      grafana = {
+        sidecar = {
+          dashboards = {
+            enabled    = true
+            label      = "grafana_dashboard"
+            labelValue = "1"
+          }
+        }
+      }
+    })
+  ]
+}
+
