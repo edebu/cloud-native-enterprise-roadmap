@@ -358,9 +358,10 @@ resource "helm_release" "prometheus_stack" {
         }
         sidecar = {
           dashboards = {
-            enabled    = true
-            label      = "grafana_dashboard"
-            labelValue = "1"
+            enabled         = true
+            label           = "grafana_dashboard"
+            labelValue      = "1"
+            searchNamespace = "ALL"
           }
         }
       }

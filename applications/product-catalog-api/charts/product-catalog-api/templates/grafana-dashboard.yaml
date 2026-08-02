@@ -1,0 +1,147 @@
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "product-catalog-api.fullname" . }}-dashboard
+  labels:
+    {{- include "product-catalog-api.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  product-catalog-api-dashboard.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "datasource",
+              "uid": "grafana"
+            },
+            "enable": true,
+            "hide": true,
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "title": "HTTP Requests Rate (5m)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum(rate(http_requests_total{namespace=\"{{ .Release.Namespace }}\"}[5m])) by (handler, status)",
+              "legendFormat": "{{"{{"}}handler{{"}}"}} - {{"{{"}}status{{"}}"}}",
+              "range": true,
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 2,
+          "title": "HTTP Average Latency (5m)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum(rate(http_request_duration_seconds_sum{namespace=\"{{ .Release.Namespace }}\"}[5m])) by (handler) / sum(rate(http_request_duration_seconds_count{namespace=\"{{ .Release.Namespace }}\"}[5m])) by (handler)",
+              "legendFormat": "{{"{{"}}handler{{"}}"}}",
+              "range": true,
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          },
+          "id": 3,
+          "title": "CPU Usage (Process)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum(rate(process_cpu_seconds_total{namespace=\"{{ .Release.Namespace }}\"}[5m])) by (pod)",
+              "legendFormat": "{{"{{"}}pod{{"}}"}}",
+              "range": true,
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          },
+          "id": 4,
+          "title": "Memory Usage (Process)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum(process_resident_memory_bytes{namespace=\"{{ .Release.Namespace }}\"}) by (pod)",
+              "legendFormat": "{{"{{"}}pod{{"}}"}}",
+              "range": true,
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["fastapi", "product-catalog-api"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Product Catalog API - FastAPI Dashboard",
+      "uid": "product-catalog-api-dashboard",
+      "version": 1,
+      "weekStart": ""
+    }
+{{- end }}
