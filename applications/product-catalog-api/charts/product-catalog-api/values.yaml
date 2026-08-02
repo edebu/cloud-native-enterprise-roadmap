@@ -35,6 +35,17 @@ config:
 secret:
   name: product-catalog-api-secret
   key: DB_PASSWORD
+  # GCP Secret Manager Configuration (Default)
+  # secretStoreName: gcp-cluster-secret-store
+  # secretStoreKind: ClusterSecretStore
+  # remoteKey: cn-er-dev-db-password
+  # version: "latest"
+  
+  # HashiCorp Vault Configuration (Uncomment to toggle)
+  secretStoreName: vault-cluster-secret-store
+  secretStoreKind: ClusterSecretStore
+  remoteKey: cn-er-dev-db-password
+  property: password
 
 resources:
   limits:
