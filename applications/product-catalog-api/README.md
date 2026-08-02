@@ -281,7 +281,7 @@ docker logs api-test   # "Shutting down" mesajını ara
 Exposes the Product Catalog API container to a GKE Autopilot private cluster with enterprise-grade security hardening:
 - **`namespace.yaml`**: Dedicated `cn-er-dev` namespace for workload isolation.
 - **`configmap.yaml`**: Sourced DB variables (`DB_HOST` pointing to Private IP `10.100.0.3`, `DB_NAME`, `DB_USER`, `DB_PORT`).
-- **`secret.yaml`**: Base64 encoded DB password value from GCP Secret Manager (foundation for External Secrets Operator in Phase 4).
+- **`secret.yaml`**: Base64 encoded DB password placeholder. For development/local testing, this can be customized manually. In production/GKE, this is managed dynamically by External Secrets Operator (Phase 4).
 - **`deployment.yaml`**:
   - Replicas: 2
   - Resource Sizing matching GKE Autopilot requirements: `250m` CPU, `512Mi` Memory.
@@ -299,7 +299,15 @@ Exposes the Product Catalog API container to a GKE Autopilot private cluster wit
 ls applications/product-catalog-api/k8s/
 ```
 
-### Step 2 — Deploy resources
+### Step 2 — Configure local DB password (Optional)
+The `secret.yaml` manifest contains a placeholder base64-encoded password (`change-me-locally`). If you want to use a custom database password for local or manual Kubernetes deployments:
+1. Generate the base64 string for your password:
+   ```bash
+   echo -n "your-db-password" | base64
+   ```
+2. Open `applications/product-catalog-api/k8s/secret.yaml` and update the value of `DB_PASSWORD` with the generated base64 string.
+
+### Step 3 — Deploy resources
 ```bash
 kubectl apply -f applications/product-catalog-api/k8s/namespace.yaml
 kubectl apply -f applications/product-catalog-api/k8s/configmap.yaml
@@ -308,12 +316,12 @@ kubectl apply -f applications/product-catalog-api/k8s/deployment.yaml
 kubectl apply -f applications/product-catalog-api/k8s/service.yaml
 ```
 
-### Step 3 — Verify deployment status
+### Step 4 — Verify deployment status
 ```bash
 kubectl rollout status deployment/product-catalog-api -n cn-er-dev --timeout=180s
 ```
 
-### Step 4 — Check pods and logs
+### Step 5 — Check pods and logs
 ```bash
 kubectl get pods -n cn-er-dev
 kubectl logs deployment/product-catalog-api -c api -n cn-er-dev --tail=50

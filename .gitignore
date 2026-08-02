@@ -3,3 +3,17 @@
 *.tfstate.*
 crash.log
 .terraform.lock.hcl
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Keys and credentials
+*.pem
+*.key
+*.pub
+*.pkcs12
+*.pfx
+secrets.yaml
