@@ -58,3 +58,11 @@ securityContext:
   capabilities:
     drop:
     - ALL
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
+  additionalLabels:
+    release: kube-prometheus-stack
+
