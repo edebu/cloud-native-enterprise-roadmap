@@ -86,7 +86,9 @@ resource "google_secret_manager_secret_iam_member" "gke_node_secret_reader" {
 # Cloud SQL — PostgreSQL 16, db-f1-micro, private IP only
 # ---------------------------------------------------------------------------
 module "cloud_sql" {
-  source = "../../../../modules/cloud-sql"
+  source = "../../../../modules/database"
+
+  cloud_provider = "gcp"
 
   project_id    = var.project_id
   region        = var.region
