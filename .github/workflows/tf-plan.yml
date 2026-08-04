@@ -1,0 +1,162 @@
+# .github/workflows/tf-plan.yml
+#
+# Terraform Plan — Runs on Pull Requests when Terraform files change
+#
+# Posts terraform plan output as a PR comment for team review.
+# Uses keyless GCP Workload Identity Federation (no SA key JSON).
+#
+# Required GitHub Secrets:
+#   GCP_PROJECT_ID
+#   GCP_WIF_PROVIDER
+#   GCP_WIF_SERVICE_ACCOUNT
+
+name: Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - "environments/**"
+      - "modules/**"
+
+env:
+  TF_VERSION: "1.9.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Terraform Plan — environments/dev/terraform (main infra)
+  # ---------------------------------------------------------------------------
+  plan-main:
+    name: Plan — dev/terraform
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write  # Required to post PR comment
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: environments/dev/terraform
+        run: terraform init
+
+      - name: Terraform Format Check
+        working-directory: environments/dev/terraform
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: environments/dev/terraform
+        run: |
+          terraform plan \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -no-color \
+            -out=tfplan 2>&1 | tee plan_output.txt
+          echo "exitcode=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Post Plan to PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('environments/dev/terraform/plan_output.txt', 'utf8');
+            const truncated = planOutput.length > 60000
+              ? planOutput.substring(0, 60000) + '\n\n...[truncated]'
+              : planOutput;
+
+            const body = `## Terraform Plan — \`environments/dev/terraform\`
+
+            <details>
+            <summary>Show Plan Output</summary>
+
+            \`\`\`terraform
+            ${truncated}
+            \`\`\`
+
+            </details>
+
+            *Triggered by @${{ github.actor }} on \`${{ github.head_ref }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Terraform Plan Status
+        if: steps.plan.outputs.exitcode == '1'
+        run: exit 1
+
+  # ---------------------------------------------------------------------------
+  # Terraform Plan — environments/dev/terraform/gke
+  # ---------------------------------------------------------------------------
+  plan-gke:
+    name: Plan — dev/terraform/gke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: environments/dev/terraform/gke
+        run: terraform init
+
+      - name: Terraform Plan
+        id: plan-gke
+        working-directory: environments/dev/terraform/gke
+        run: |
+          terraform plan \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -no-color 2>&1 | tee plan_output.txt
+        continue-on-error: true
+
+      - name: Post Plan to PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('environments/dev/terraform/gke/plan_output.txt', 'utf8');
+            const truncated = planOutput.length > 60000
+              ? planOutput.substring(0, 60000) + '\n\n...[truncated]'
+              : planOutput;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Terraform Plan — \`environments/dev/terraform/gke\`\n\n<details><summary>Show Plan</summary>\n\n\`\`\`terraform\n${truncated}\n\`\`\`\n\n</details>`
+            });
