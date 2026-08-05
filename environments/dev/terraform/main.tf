@@ -1,6 +1,7 @@
-﻿module "network" {
+module "network" {
   source = "../../../modules/network"
 
+  cloud_provider      = "gcp"
   project_id          = var.project_id
   region              = var.region
   network_name        = "dev-enterprise-vpc"
@@ -11,6 +12,7 @@
 module "iam" {
   source = "../../../modules/iam"
 
+  cloud_provider     = "gcp"
   project_id         = var.project_id
   service_account_id = "devops-automation-sa"
   display_name       = "DevOps Automation Service Account for Dev"
@@ -24,7 +26,9 @@ module "iam" {
 # once the GKE SA email is known.
 # ---------------------------------------------------------------------------
 module "artifact_registry" {
-  source = "../../../modules/artifact-registry"
+  source = "../../../modules/registry"
+
+  cloud_provider = "gcp"
 
   project_id    = var.project_id
   region        = var.region

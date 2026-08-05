@@ -44,13 +44,14 @@ data "google_project" "project" {
 # GKE Autopilot Cluster
 # ---------------------------------------------------------------------------
 module "gke" {
-  source = "../../../../modules/gke"
+  source = "../../../../modules/kubernetes"
 
-  project_id      = var.project_id
-  region          = var.region
-  cluster_name    = "cn-er-dev-autopilot"
-  network_name    = data.google_compute_network.vpc.name
-  subnetwork_name = data.google_compute_subnetwork.private.name
+  cloud_provider         = "gcp"
+  project_id             = var.project_id
+  region                 = var.region
+  cluster_name           = "cn-er-dev-autopilot"
+  network_name           = data.google_compute_network.vpc.name
+  subnetwork_name        = data.google_compute_subnetwork.private.name
 
   # 172.16.0.0/28 is reserved for GKE control plane peering.
   # Does not conflict with 10.10.x.x subnets from Phase 1.
@@ -66,7 +67,7 @@ module "gke" {
   labels = {
     managed-by  = "terraform"
     environment = "dev"
-    phase       = "phase2"
+    phase       = "phase5"
   }
 }
 
