@@ -48,12 +48,18 @@ async def create_tables():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+from sqlalchemy import delete
+from src.models import Product
+
+
 @pytest_asyncio.fixture
 async def db_session():
-    """Yields a clean DB session that is rolled back after each test."""
+    """Yields a clean DB session and clears tables to ensure test isolation."""
     async with TestSessionLocal() as session:
         yield session
-        await session.rollback()
+        # Clear tables so subsequent tests start with a clean slate
+        await session.execute(delete(Product))
+        await session.commit()
 
 
 @pytest_asyncio.fixture
