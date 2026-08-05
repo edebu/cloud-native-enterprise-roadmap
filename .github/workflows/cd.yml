@@ -44,6 +44,8 @@ env:
   IMAGE_REPO: ${{ secrets.GCP_PROJECT_ID }}/app-images/product-catalog-api
   GKE_CLUSTER: cn-er-dev-autopilot
 
+permissions: read-all
+
 jobs:
   # ---------------------------------------------------------------------------
   # Job 1: Build & Push to GAR

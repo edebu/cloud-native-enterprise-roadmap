@@ -1,0 +1,18 @@
+# .github/CODEOWNERS
+#
+# Define code ownership for sensitive folders to enforce strict reviews
+# on public contributions.
+#
+# Patterns are matched from top to bottom.
+# Changes to these paths require approval from the owners listed below.
+#
+# Documented in: docs/decision-records/015-public-repo-security.md
+
+# CI/CD Workflows
+/.github/workflows/       @edebu
+
+# Cloud-Agnostic Terraform Modules
+/modules/                 @edebu
+
+# Environment Wireups
+/environments/            @edebu
