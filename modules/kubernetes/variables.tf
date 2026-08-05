@@ -104,6 +104,36 @@ variable "node_instance_type" {
   default     = "t3.medium"
 }
 
+variable "kubernetes_version" {
+  type        = string
+  description = "Kubernetes version for EKS cluster."
+  default     = "1.30"
+}
+
+variable "cluster_security_group_id" {
+  type        = string
+  description = "Security group ID to attach to the EKS API server."
+  default     = ""
+}
+
+variable "node_desired_size" {
+  type        = number
+  description = "Desired EKS node count."
+  default     = 2
+}
+
+variable "node_min_size" {
+  type        = number
+  description = "Minimum EKS node count."
+  default     = 1
+}
+
+variable "node_max_size" {
+  type        = number
+  description = "Maximum EKS node count."
+  default     = 3
+}
+
 variable "tags" {
   type        = map(string)
   description = "AWS tags for all resources."
