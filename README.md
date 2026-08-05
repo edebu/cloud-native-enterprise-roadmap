@@ -1,122 +1,78 @@
 # Cloud Native Enterprise Roadmap (CN-ER)
 
-Production-ready, modular, and cloud-agnostic infrastructure roadmap designed to demonstrate enterprise-grade DevOps and Platform Engineering competencies on Google Cloud Platform (GCP), with multi-cloud adaptability.
+Production-ready, modular, and cloud-agnostic infrastructure roadmap designed to demonstrate enterprise-grade DevOps and Platform Engineering competencies on Google Cloud Platform (GCP), with full multi-cloud adaptability via provider-agnostic Terraform modules.
+
+[![CI — Build, Test & Security Scan](https://github.com/edebu/cloud-native-enterprise-roadmap/actions/workflows/ci.yml/badge.svg)](https://github.com/edebu/cloud-native-enterprise-roadmap/actions/workflows/ci.yml)
+[![CD — Build, Push & Deploy](https://github.com/edebu/cloud-native-enterprise-roadmap/actions/workflows/cd.yml/badge.svg)](https://github.com/edebu/cloud-native-enterprise-roadmap/actions/workflows/cd.yml)
+[![Terraform Plan](https://github.com/edebu/cloud-native-enterprise-roadmap/actions/workflows/tf-plan.yml/badge.svg)](https://github.com/edebu/cloud-native-enterprise-roadmap/actions/workflows/tf-plan.yml)
 
 ---
 
-### 🏗️ Architecture Overview (Phase 3)
+### 🏗️ Architecture Overview (Phase 5)
 
-Aşağıdaki şema, Phase 3 (Aşama 3) sonunda elde edilen GitOps mimarisini, ArgoCD pull-model deployment kurgusunu, Workload Identity entegrasyonlu External Secrets Operator (ESO) ve GCP Secret Manager bağlantısını temsil eder.
+Aşağıdaki şema, Phase 5 (Aşama 5) sonunda elde edilen cloud-agnostic mimariyi, provider-agnostic Terraform modül hiyerarşisini ve GitHub Actions CI/CD pipeline'ını temsil eder.
 
 ```mermaid
 graph TD
-    subgraph Client ["Client & CI/CD"]
-        User["🌐 External User (Internet)"]
-        Local["💻 Developer (Local)"]
-        GitRepo["🐙 GitHub Repository<br>(Monorepo: cn-er)"]
+    subgraph CICD ["GitHub Actions CI/CD"]
+        PR["🔀 Pull Request<br>(ci.yml: test + trivy + tf-validate)"]
+        Merge["✅ Merge to main<br>(cd.yml: build + push + sync)"]
+        TFPlan["📋 TF Plan Comment<br>(tf-plan.yml)"]
     end
 
-    subgraph GCP ["Google Cloud Platform Project (spartan-alcove-...)"]
-        
-        subgraph GLB ["GCP External Application Load Balancer"]
-            Ingress["🕸️ GKE Ingress (GCE class)<br>(External IP: 136.68.246.128)"]
-        end
-
-        subgraph VPC ["Enterprise VPC (dev-enterprise-vpc)"]
-            direction TB
-            
-            subgraph PrivateSubnet ["Private Subnet (10.10.2.0/24)"]
-                subgraph GKE ["GKE Autopilot Private Cluster (cn-er-dev-autopilot)"]
-                    direction TB
-                    
-                    subgraph NS_Argo ["Namespace: argocd"]
-                        ArgoCD["⚙️ ArgoCD Controller & Server"]
-                    end
-
-                    subgraph NS_ESO ["Namespace: external-secrets"]
-                        ESO["🔒 External Secrets Operator"]
-                        KSA_ESO["🔑 KSA: external-secrets"]
-                    end
-
-                    subgraph NS_Vault ["Namespace: vault"]
-                        Vault["🔐 HashiCorp Vault (Raft Storage)"]
-                    end
-
-                    subgraph NS_Mon ["Namespace: monitoring"]
-                        Prom["📊 Prometheus Server"]
-                        Grafana["📈 Grafana Dashboards"]
-                    end
-
-                    subgraph NS_App ["Namespace: cn-er-dev"]
-                        Pod1["📦 product-catalog-api Pod 1"]
-                        Pod2["📦 product-catalog-api Pod 2"]
-                        Service["🔌 ClusterIP Service"]
-                        ExtSec["🔒 ExternalSecret Resource"]
-                        Secret["🔑 K8s Secret (product-catalog-api-secret)"]
-                    end
-                end
-            end
-
-            NAT["🌐 Cloud NAT & Cloud Router<br>(Secure Outbound Egress)"]
-            VPC_PEER["🔗 Private Services Access (VPC Peering)"]
-        end
-
-        subgraph GAR ["Google Artifact Registry"]
-            Registry["📦 Docker Repository<br>(app-images/product-catalog-api)"]
-        end
-
-        subgraph SecretManager ["GCP Secret Manager"]
-            DBPass["🔑 cn-er-dev-db-password"]
-        end
-
-        subgraph ManagedServices ["Google Managed Services Network"]
-            CloudSQL["🗄️ Cloud SQL PostgreSQL Instance<br>(Private IP: 10.100.0.3, Port 5432)"]
-        end
-
-        subgraph IAM ["IAM & Security"]
-            GSA_DevOps["👤 DevOps Service Account<br>(devops-automation-sa)"]
-            GSA_ESO["👤 ESO Service Account<br>(eso-secrets-sa)"]
-            WI["🔗 GKE Workload Identity"]
-        end
+    subgraph Modules ["Cloud-Agnostic Terraform Modules"]
+        direction LR
+        MNet["modules/network<br>gcp/ + aws/"]
+        MK8s["modules/kubernetes<br>gcp/ + aws/"]
+        MDB["modules/database<br>gcp/ + aws/"]
+        MReg["modules/registry<br>gcp/ + aws/"]
+        MIAM["modules/iam<br>gcp/ + aws/"]
+        MSec["modules/secrets<br>gcp/ + aws/"]
     end
 
-    subgraph Backend ["Remote State Management"]
-        GCS["🗄️ GCS Terraform State Bucket"]
+    subgraph GCP ["Google Cloud Platform (Active — Phases 1-5)"]
+        subgraph GCPNET ["GCP Network"]
+            VPC["🕸️ VPC (dev-enterprise-vpc)<br>Cloud NAT + Cloud Router"]
+        end
+        subgraph GCPK8S ["GKE Autopilot"]
+            ArgoCD["⚙️ ArgoCD"]
+            ESO["🔒 ESO + Workload Identity"]
+            Vault["🔐 HashiCorp Vault"]
+            Prom["📊 Prometheus + Grafana"]
+            App["📦 product-catalog-api"]
+        end
+        CloudSQL["🗄️ Cloud SQL PostgreSQL 16"]
+        GAR["📦 Google Artifact Registry"]
+        SecMgr["🔑 GCP Secret Manager"]
     end
 
-    User -->|"HTTP (Port 80)"| Ingress
-    Ingress -->|"Container-Native Load Balancing (NEGs)"| Pod1
-    Ingress -->|"Container-Native Load Balancing (NEGs)"| Pod2
-    Service -.->|"Logical Abstraction"| Pod1
-    Service -.->|"Logical Abstraction"| Pod2
-    
-    Pod1 -->|"Private DB Connection"| VPC_PEER
-    Pod2 -->|"Private DB Connection"| VPC_PEER
-    VPC_PEER -->|"Peered Access"| CloudSQL
-    
-    ArgoCD -->|"GitOps Pull Manifests"| GitRepo
-    ArgoCD -->|"Deploys & Syncs"| NS_App
-    
-    ExtSec -.->|"Defines"| Secret
-    Secret -->|"Provides DB_PASS"| Pod1
-    Secret -->|"Provides DB_PASS"| Pod2
-    
-    KSA_ESO -.->|"Impersonates via WI"| GSA_ESO
-    GSA_ESO -->|"Reads Password"| DBPass
-    ESO -.->|"Fetches DBPass & Populates"| Secret
-    
-    KSA_ESO -->|"Kubernetes Auth"| Vault
-    ESO -->|"Pulls Secrets"| Vault
-    
-    Prom -->|"Scrapes Metrics (/metrics)"| Pod1
-    Prom -->|"Scrapes Metrics (/metrics)"| Pod2
-    Grafana -->|"Queries Metrics"| Prom
-    
-    GKE -->|"Pull Container Images"| Registry
-    GKE -->|"Outbound Egress"| NAT
-    
-    Local -->|"Terraform Plan/Apply"| GCS
-    GCS -->|"Provisions & Manages"| GCP
+    subgraph AWS ["Amazon Web Services (Code + Plan — Phase 5)"]
+        subgraph AWSNET ["AWS Network"]
+            AWSVPC["🕸️ VPC (10.20.0.0/16)<br>NAT Gateway + IGW"]
+        end
+        subgraph AWSK8S ["EKS Managed Node Group"]
+            IRSA["🔗 IRSA (OIDC)"]
+        end
+        RDS["🗄️ RDS PostgreSQL 15"]
+        ECR["📦 ECR"]
+        AWSSecMgr["🔑 AWS Secrets Manager"]
+    end
+
+    PR --> Merge
+    Merge -->|"docker push"| GAR
+    Merge -->|"argocd app sync"| ArgoCD
+    TFPlan -->|"posted as PR comment"| PR
+
+    MNet -->|"cloud_provider=gcp"| VPC
+    MNet -->|"cloud_provider=aws"| AWSVPC
+    MK8s -->|"cloud_provider=gcp"| GCPK8S
+    MK8s -->|"cloud_provider=aws"| AWSK8S
+    MDB -->|"cloud_provider=gcp"| CloudSQL
+    MDB -->|"cloud_provider=aws"| RDS
+    MReg -->|"cloud_provider=gcp"| GAR
+    MReg -->|"cloud_provider=aws"| ECR
+    MSec -->|"cloud_provider=gcp"| SecMgr
+    MSec -->|"cloud_provider=aws"| AWSSecMgr
 ```
 
 ---
@@ -125,39 +81,81 @@ graph TD
 
 | Phase | Topic | Status | Technologies |
 | :---: | :--- | :---: | :--- |
-| **Phase 1** | IaC, VPC, Cloud NAT, IAM & GCS Backend | Completed | Terraform, GCP, Git |
-| **Phase 2** | Containerization & GKE Cluster (NEG, Ingress, Cloud SQL) | Completed | Docker, GKE, Kubernetes, PostgreSQL |
-| **Phase 3** | GitOps & Continuous Delivery | Completed | ArgoCD, Helm, External Secrets Operator, Workload Identity |
-| **Phase 4** | Enterprise Observability & Security | Completed | Prometheus, Grafana, Vault |
-| **Phase 5** | Multi-Cloud Agnostic Transformation | Planned | Terraform (AWS/GCP abstraction) |
+| **Phase 1** | IaC, VPC, Cloud NAT, IAM & GCS Backend | ✅ Completed | Terraform, GCP, Git |
+| **Phase 2** | Containerization & GKE Cluster (NEG, Ingress, Cloud SQL) | ✅ Completed | Docker, GKE, Kubernetes, PostgreSQL |
+| **Phase 3** | GitOps & Continuous Delivery | ✅ Completed | ArgoCD, Helm, External Secrets Operator, Workload Identity |
+| **Phase 4** | Enterprise Observability & Security | ✅ Completed | Prometheus, Grafana, Vault |
+| **Phase 5** | Multi-Cloud Agnostic Transformation | ✅ Completed | Terraform (AWS/GCP abstraction), GitHub Actions |
+
+---
+
+## 🏛️ Multi-Cloud Module Architecture
+
+Phase 5'in temel katkısı, tüm Terraform modüllerinin cloud-agnostic wrapper pattern'e dönüştürülmesidir:
+
+```
+modules/
+├── network/          ← Wrapper: var.cloud_provider = "gcp" | "aws"
+│   ├── gcp/          ← VPC, Cloud NAT, Cloud Router, Firewall Rules
+│   └── aws/          ← VPC, IGW, NAT Gateway, Security Groups
+├── kubernetes/
+│   ├── gcp/          ← GKE Autopilot
+│   └── aws/          ← EKS Managed Node Group + IRSA (OIDC)
+├── database/
+│   ├── gcp/          ← Cloud SQL PostgreSQL (Private Service Access)
+│   └── aws/          ← RDS PostgreSQL (DB Subnet Group)
+├── registry/
+│   ├── gcp/          ← Google Artifact Registry (DOCKER)
+│   └── aws/          ← ECR + Lifecycle Policy
+├── iam/
+│   ├── gcp/          ← Service Account + Project IAM Bindings
+│   └── aws/          ← IAM Role + Instance Profile + Policy Attachments
+└── secrets/
+    ├── gcp/          ← GCP Secret Manager
+    └── aws/          ← AWS Secrets Manager + IRSA Read Policy
+```
+
+### GCP ↔ AWS Equivalence Map
+
+| Component | GCP | AWS |
+|:----------|:----|:----|
+| Virtual Network | VPC (`google_compute_network`) | VPC (`aws_vpc`) |
+| Egress NAT | Cloud NAT + Cloud Router | NAT Gateway + Elastic IP |
+| Kubernetes | GKE Autopilot | EKS Managed Node Group |
+| Pod Cloud Identity | Workload Identity (KSA→GSA) | IRSA (OIDC token exchange) |
+| Database | Cloud SQL PostgreSQL 16 | RDS PostgreSQL 15 |
+| Container Registry | Artifact Registry (GAR) | Elastic Container Registry (ECR) |
+| Secret Store | Secret Manager | AWS Secrets Manager |
+| CI/CD Auth | Workload Identity Federation | WIF (same — GitHub OIDC) |
 
 ---
 
 ## 🛠️ Getting Started & Verification
 
-### 1. Provision Infrastructure & Platform Tools (Terraform)
-Altyapı modüllerini ve cluster platform araçlarını (ArgoCD, ESO, IAM) ayağa kaldırmak için:
+### 1. Provision Infrastructure (GCP — Active Environment)
 
 ```bash
-# Temel Altyapı (Phase 1 & Phase 2 GAR)
+# Base Infrastructure (Phase 1 & Phase 2 GAR)
 cd environments/dev/terraform
 terraform init
-terraform apply
+terraform apply -var="project_id=<YOUR_PROJECT_ID>"
 
-# GKE Cluster & Platform Araçları (Phase 2 GKE, ArgoCD, ESO, IAM & Workload Identity)
-cd ../gke
+# GKE Cluster & Platform Tools (Phase 2 GKE, ArgoCD, ESO, IAM & Workload Identity)
+cd gke
 terraform init
-terraform apply
+terraform apply -var="project_id=<YOUR_PROJECT_ID>"
 ```
 
 ### 2. Connect to GKE Cluster
-Oluşturulan private GKE Autopilot cluster'ına bağlanmak için:
+
 ```bash
-gcloud container clusters get-credentials cn-er-dev-autopilot --region europe-west3 --project spartan-alcove-450719-n2
+gcloud container clusters get-credentials cn-er-dev-autopilot \
+  --region europe-west3 \
+  --project <YOUR_PROJECT_ID>
 ```
 
 ### 3. Deploy Platform GitOps Manifests (Kubernetes)
-Secret Store ve GitOps tanımlarını uygulayarak bootstrap sürecini tamamlamak için:
+
 ```bash
 kubectl apply -f gitops/argo-cd/cluster/cluster-secret-store.yaml
 kubectl apply -f gitops/argo-cd/projects/dev-project.yaml
@@ -165,34 +163,82 @@ kubectl apply -f gitops/argo-cd/apps/product-catalog-api.yaml
 ```
 
 ### 4. Verify GitOps & Connectivity
-GitOps durumunu ve harici erişimi test etmek için:
+
 ```bash
-# ArgoCD Uygulama durumunu doğrulayın
+# ArgoCD Application status
 kubectl get application product-catalog-api -n argocd
 
-# ExternalSecret durumunu kontrol edin (STATUS: SecretSynced olmalıdır)
+# ExternalSecret status (STATUS: SecretSynced beklenmeli)
 kubectl get externalsecret product-catalog-api-secret -n cn-er-dev
 
-# Ingress durumunu ve IP adresini kontrol edin
+# Ingress IP
 kubectl get ingress product-catalog-api-ingress -n cn-er-dev
 
-# API Sağlık durumunu ve veritabanı bağlantısını kontrol edin
+# API health check
 curl -i http://<INGRESS_IP>/health
-# Beklenen Yanıt: {"status":"healthy","db_connected":true,"version":"0.1.0"}
+# Expected: {"status":"healthy","db_connected":true,"version":"0.1.0"}
 ```
+
+### 5. Switch to AWS (Multi-Cloud Demo)
+
+AWS modüllerini çalıştırmak için:
+
+```bash
+# AWS credentials yapılandır
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_DEFAULT_REGION=eu-central-1
+
+# AWS provider'ı etkinleştir (örnek providers.tf gerektirir)
+# Tüm modüller cloud_provider = "aws" ile çağrılabilir:
+# module "network" {
+#   source         = "../../../modules/network"
+#   cloud_provider = "aws"
+#   region         = "eu-central-1"
+#   ...
+# }
+```
+
+Detaylı kullanım kılavuzu: [docs/multi-cloud-usage-guide.md](docs/multi-cloud-usage-guide.md)
+
+---
+
+## 🔄 CI/CD Pipeline
+
+Phase 5 ile eklenen GitHub Actions pipeline'ı:
+
+| Workflow | Tetikleyici | Adımlar |
+|:---------|:-----------|:--------|
+| `ci.yml` | Her PR | pytest → Docker build → Trivy scan → TF validate |
+| `cd.yml` | main'e merge | WIF auth → GAR push → ArgoCD sync |
+| `tf-plan.yml` | Terraform PR | TF plan → PR comment |
+
+**Keyless GCP Authentication:** GitHub Actions, service account JSON key gerektirmeden GCP Workload Identity Federation (WIF) üzerinden authenticate olur.
+
+Kurulum için gerekli GitHub Secrets:
+- `GCP_PROJECT_ID`
+- `GCP_WIF_PROVIDER`
+- `GCP_WIF_SERVICE_ACCOUNT`
 
 ---
 
 ## 🗂️ Architecture Decision Records (ADRs)
 
-Detaylı teknik kararlar ve mimari seçimler için [Architecture Decision Records (ADRs)](docs/decision-records/) dizinini inceleyebilirsiniz.
+Detaylı teknik kararlar için [docs/decision-records/](docs/decision-records/) dizinini inceleyin.
 
-Mevcut ADR dokümanları:
-- [ADR 001: Remote GCS Backend and Cloud NAT](docs/decision-records/001-gcs-backend-and-cloud-nat.md)
-- [ADR 002: Multi-stage Docker Build](docs/decision-records/002-multi-stage-docker-build.md)
-- [ADR 003: GCP Artifact Registry](docs/decision-records/003-artifact-registry.md)
-- [ADR 004: GKE Autopilot Cluster](docs/decision-records/004-gke-autopilot.md)
-- [ADR 005: Cloud SQL PostgreSQL Integration](docs/decision-records/005-cloud-sql-private-ip.md)
-- [ADR 006: Kubernetes Deployment Manifests](docs/decision-records/006-kubernetes-manifests.md)
-- [ADR 007: GKE Ingress with GCP Load Balancer](docs/decision-records/007-gke-ingress.md)
-- [ADR 008: GitOps and Secret Management Integration](docs/decision-records/008-gitops-and-secret-management.md)
+| ADR | Konu | Faz |
+|:-----|:-----|:-----|
+| [ADR 001](docs/decision-records/001-gcs-backend-and-cloud-nat.md) | Remote GCS Backend and Cloud NAT | Phase 1 |
+| [ADR 002](docs/decision-records/002-multi-stage-docker-build.md) | Multi-stage Docker Build | Phase 2 |
+| [ADR 003](docs/decision-records/003-artifact-registry.md) | GCP Artifact Registry | Phase 2 |
+| [ADR 004](docs/decision-records/004-gke-autopilot.md) | GKE Autopilot Cluster | Phase 2 |
+| [ADR 005](docs/decision-records/005-cloud-sql-private-ip.md) | Cloud SQL PostgreSQL Integration | Phase 2 |
+| [ADR 006](docs/decision-records/006-kubernetes-manifests.md) | Kubernetes Deployment Manifests | Phase 2 |
+| [ADR 007](docs/decision-records/007-gke-ingress.md) | GKE Ingress with GCP Load Balancer | Phase 2 |
+| [ADR 008](docs/decision-records/008-gitops-and-secret-management.md) | GitOps and Secret Management Integration | Phase 3 |
+| [ADR 009](docs/decision-records/009-multi-cloud-strategy.md) | **Multi-Cloud Agnostic Terraform Module Strategy** | Phase 5 |
+| [ADR 010](docs/decision-records/010-aws-network-design.md) | **AWS Network Design** | Phase 5 |
+| [ADR 011](docs/decision-records/011-eks-vs-gke-tradeoffs.md) | **EKS vs GKE Autopilot Tradeoffs** | Phase 5 |
+| [ADR 012](docs/decision-records/012-rds-vs-cloud-sql.md) | **RDS vs Cloud SQL** | Phase 5 |
+| [ADR 013](docs/decision-records/013-github-actions-cicd.md) | **GitHub Actions CI/CD Pipeline Design** | Phase 5 |
+| [ADR 014](docs/decision-records/014-aws-iam-vs-gcp-iam.md) | **AWS IAM vs GCP IAM** | Phase 5 |
