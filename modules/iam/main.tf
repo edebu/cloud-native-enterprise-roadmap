@@ -1,19 +1,28 @@
-# 1. Service Account Oluşturulması
-resource "google_service_account" "sa" {
-  account_id   = var.service_account_id
-  display_name = var.display_name
-  project      = var.project_id
+# modules/iam/main.tf
+#
+# Cloud-agnostic IAM module wrapper.
+#
+# GCP: Google Service Account + Project IAM bindings (Storage Viewer, Log Writer)
+# AWS: IAM Role + Instance Profile + managed policy attachments
+#
+# ADR: docs/decision-records/014-aws-iam-vs-gcp-iam.md
+
+module "gcp" {
+  source = "./gcp"
+  count  = var.cloud_provider == "gcp" ? 1 : 0
+
+  project_id         = var.project_id
+  service_account_id = var.service_account_id
+  display_name       = var.display_name
 }
 
-# 2. Least Privilege IAM Binding (Örn: Sadece Storage Object Viewer ve Log Writer rolleri)
-resource "google_project_iam_member" "sa_storage_viewer" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_service_account.sa.email}"
-}
+module "aws" {
+  source = "./aws"
+  count  = var.cloud_provider == "aws" ? 1 : 0
 
-resource "google_project_iam_member" "sa_log_writer" {
-  project = var.project_id
-  role    = "roles/logging.logWriter"
-  member  = "serviceAccount:${google_service_account.sa.email}"
+  role_name              = var.service_account_id
+  display_name           = var.display_name
+  assume_role_principals = var.assume_role_principals
+  managed_policy_arns    = var.managed_policy_arns
+  tags                   = var.tags
 }
