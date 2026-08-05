@@ -17,3 +17,17 @@ pydantic==2.11.*
 
 # Observability — Prometheus metrics (Phase 5 hook)
 prometheus-client==0.21.*
+
+# ---------------------------------------------------------------------------
+# Test dependencies
+# (also installed in CI — no separate requirements-test.txt needed)
+# ---------------------------------------------------------------------------
+
+# Async HTTP test client for FastAPI (replaces TestClient for async routes)
+httpx==0.28.*
+
+# Async pytest plugin (asyncio_mode=auto in pyproject.toml)
+pytest-asyncio==0.26.*
+
+# Async SQLite driver — replaces asyncpg in tests (no real DB needed in CI)
+aiosqlite==0.21.*

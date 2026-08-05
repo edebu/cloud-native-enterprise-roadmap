@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+# asyncio_mode = "auto": all async test functions are automatically treated
+# as asyncio coroutines without needing @pytest.mark.asyncio on each one.
+# This requires pytest-asyncio >= 0.21.
+asyncio_mode = "auto"
+testpaths = ["src/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
