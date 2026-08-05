@@ -19,6 +19,7 @@ DELETE /products/{id}          — Delete product
 
 import os
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
@@ -211,7 +212,7 @@ async def list_products(
 
 
 @app.get("/products/{product_id}", response_model=ProductResponse, tags=["Products"])
-async def get_product(product_id: str, db: AsyncSession = Depends(get_db)):
+async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Fetch a single product by UUID."""
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()
@@ -221,7 +222,7 @@ async def get_product(product_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @app.patch("/products/{product_id}", response_model=ProductResponse, tags=["Products"])
-async def update_product(product_id: str, payload: ProductUpdate, db: AsyncSession = Depends(get_db)):
+async def update_product(product_id: uuid.UUID, payload: ProductUpdate, db: AsyncSession = Depends(get_db)):
     """Partially update a product. Only provided fields are changed."""
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()
@@ -238,7 +239,7 @@ async def update_product(product_id: str, payload: ProductUpdate, db: AsyncSessi
 
 
 @app.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Products"])
-async def delete_product(product_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Delete a product from the catalog."""
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()

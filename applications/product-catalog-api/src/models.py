@@ -5,8 +5,7 @@ models.py — SQLAlchemy ORM models for the Product Catalog API.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Numeric, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -32,7 +31,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
     )

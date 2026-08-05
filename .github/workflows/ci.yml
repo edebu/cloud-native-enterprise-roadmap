@@ -5,15 +5,17 @@
 # Triggers when:
 #   - application code changes (applications/**)
 #   - workflow files change (.github/workflows/**)
+#   - module changes (modules/**)
 #
-# Steps:
-#   1. Python unit tests (pytest)
-#   2. Docker build (multi-stage)
+# Jobs:
+#   1. Python unit tests (pytest + pytest-asyncio + httpx + aiosqlite)
+#   2. Docker build (multi-stage, no push)
 #   3. Trivy security scan (CRITICAL + HIGH = fail)
 #   4. terraform fmt/validate (when modules/** change)
 #
-# Authentication: No GCP/AWS credentials needed for CI — tests run locally.
-# Docker push happens in the CD pipeline (cd.yml) only.
+# No GCP/AWS credentials needed for CI:
+#   - Tests use SQLite in-memory (no real PostgreSQL)
+#   - Docker push happens in cd.yml only
 
 name: CI — Build, Test & Security Scan
 
@@ -34,6 +36,11 @@ env:
 jobs:
   # ---------------------------------------------------------------------------
   # Job 1: Python Unit Tests
+  #
+  # Uses SQLite in-memory via aiosqlite — no PostgreSQL service needed.
+  # Test config: applications/product-catalog-api/pyproject.toml
+  #   asyncio_mode = "auto"
+  #   testpaths = ["src/tests"]
   # ---------------------------------------------------------------------------
   test:
     name: Python Unit Tests
@@ -54,17 +61,19 @@ jobs:
           cache: "pip"
           cache-dependency-path: applications/product-catalog-api/requirements.txt
 
-      - name: Install dependencies
+      - name: Install dependencies (incl. test deps from requirements.txt)
         run: pip install -r requirements.txt
+
+      - name: Install pytest + coverage
+        run: pip install pytest pytest-cov
 
       - name: Run pytest
         run: |
-          pip install pytest pytest-cov
-          pytest src/ -v --tb=short --cov=src --cov-report=term-missing
+          pytest -v --tb=short --cov=src --cov-report=term-missing
         env:
-          # Test environment — no real DB connection
-          DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
           ENV: "test"
+          # DATABASE_URL is not needed — tests use SQLite in-memory (aiosqlite).
+          # The conftest.py overrides the get_db dependency with a test session.
 
   # ---------------------------------------------------------------------------
   # Job 2: Docker Build & Security Scan (Trivy)
