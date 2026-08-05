@@ -1,0 +1,148 @@
+# .github/workflows/ci.yml
+#
+# CI Pipeline — Runs on every Pull Request
+#
+# Triggers when:
+#   - application code changes (applications/**)
+#   - workflow files change (.github/workflows/**)
+#
+# Steps:
+#   1. Python unit tests (pytest)
+#   2. Docker build (multi-stage)
+#   3. Trivy security scan (CRITICAL + HIGH = fail)
+#   4. terraform fmt/validate (when modules/** change)
+#
+# Authentication: No GCP/AWS credentials needed for CI — tests run locally.
+# Docker push happens in the CD pipeline (cd.yml) only.
+
+name: CI — Build, Test & Security Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "feature/**"
+    paths:
+      - "applications/**"
+      - ".github/workflows/**"
+      - "modules/**"
+
+env:
+  IMAGE_NAME: product-catalog-api
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Python Unit Tests
+  # ---------------------------------------------------------------------------
+  test:
+    name: Python Unit Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: applications/product-catalog-api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: applications/product-catalog-api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: |
+          pip install pytest pytest-cov
+          pytest src/ -v --tb=short --cov=src --cov-report=term-missing
+        env:
+          # Test environment — no real DB connection
+          DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
+          ENV: "test"
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Docker Build & Security Scan (Trivy)
+  # ---------------------------------------------------------------------------
+  docker-build-scan:
+    name: Docker Build + Trivy Scan
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: applications/product-catalog-api
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
+          format: "table"
+          exit-code: "1"          # Fail the PR if CRITICAL or HIGH vulns found
+          ignore-unfixed: true    # Skip vulnerabilities with no fix available
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Terraform Validate (module changes only)
+  # ---------------------------------------------------------------------------
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    if: |
+      github.event.pull_request.changed_files > 0 &&
+      contains(join(github.event.pull_request.head.commit.message, ' '), 'module')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive modules/
+
+      - name: Terraform Validate — network module
+        run: |
+          cd modules/network
+          terraform init -backend=false
+          terraform validate
+
+      - name: Terraform Validate — kubernetes module
+        run: |
+          cd modules/kubernetes
+          terraform init -backend=false
+          terraform validate
+
+      - name: Terraform Validate — database module
+        run: |
+          cd modules/database
+          terraform init -backend=false
+          terraform validate
+
+      - name: Terraform Validate — registry module
+        run: |
+          cd modules/registry
+          terraform init -backend=false
+          terraform validate
