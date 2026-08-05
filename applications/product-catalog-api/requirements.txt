@@ -5,9 +5,8 @@
 # Exact pinning is done in requirements-lock.txt (generated via pip-compile).
 
 # Web framework
-fastapi==0.115.*
+fastapi>=0.130.0
 uvicorn[standard]==0.34.*
-starlette>=0.49.1
 
 # Database — async PostgreSQL driver
 sqlalchemy[asyncio]==2.0.*
